@@ -17,8 +17,10 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json ./
 COPY packages/console ./packages/console
 
-# Build the console
+# Build the console with production API URL
 WORKDIR /app/packages/console
+ARG VITE_API_URL=https://britepulse-api-29820647719.us-central1.run.app
+ENV VITE_API_URL=${VITE_API_URL}
 RUN pnpm build
 
 # Production stage - serve static files with nginx

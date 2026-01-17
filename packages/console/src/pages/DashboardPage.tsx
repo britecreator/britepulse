@@ -6,9 +6,9 @@ export default function DashboardPage() {
   const { user, hasRole } = useAuth();
   const { data: issuesData, isLoading: issuesLoading } = useIssues({
     status: ['new', 'triaged', 'in_progress'],
-    limit: 5,
+    page_size: 5,
     sort_by: 'priority_score',
-    sort_order: 'desc',
+    sort_dir: 'desc',
   });
   const { data: apps, isLoading: appsLoading } = useApps();
 

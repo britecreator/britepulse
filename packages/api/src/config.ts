@@ -7,8 +7,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
-  // Server
-  port: parseInt(process.env.API_PORT || '3001', 10),
+  // Server - Cloud Run uses PORT, local dev can use API_PORT
+  port: parseInt(process.env.PORT || process.env.API_PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
 
   // Google Cloud

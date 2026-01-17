@@ -1,6 +1,6 @@
 /**
  * Console-specific types
- * These are simplified versions for the UI
+ * These align with the shared package types
  */
 
 export type Severity = 'P0' | 'P1' | 'P2' | 'P3';
@@ -16,47 +16,65 @@ export interface User {
   app_access?: string[];
 }
 
+export interface EnvironmentConfig {
+  env_name: string;
+  enabled: boolean;
+  daily_brief_enabled?: boolean;
+  ai_enabled?: boolean;
+}
+
+export interface AppOwners {
+  po_emails: string[];
+  engineering_owner_group?: string | string[];
+}
+
+export interface AIPolicy {
+  eligible_severity_min: Severity;
+  eligible_recurrence_min: number;
+  model_allowed_inputs: string[];
+}
+
+export interface AttachmentPolicy {
+  allowed: boolean;
+  restricted_roles: UserRole[];
+}
+
+export interface Policy {
+  redaction_profile?: 'standard' | 'strict' | 'minimal';
+  attachment_policy?: AttachmentPolicy;
+  ai_policy?: AIPolicy;
+  telemetry_policy?: {
+    frontend_enabled: boolean;
+    backend_enabled: boolean;
+    sampling_rules: Array<{
+      route_pattern?: string;
+      sample_rate: number;
+    }>;
+  };
+}
+
+export interface Schedule {
+  daily_brief_time_local?: string;
+  daily_brief_timezone?: string;
+  daily_brief_max_items?: number;
+  daily_brief_min_items?: number;
+  daily_brief_recipients?: string[];
+}
+
 export interface App {
   app_id: string;
   name: string;
-  environments: string[];
+  environments: EnvironmentConfig[];
   base_url_patterns: string[];
-  owners: string[];
-  policies: {
-    auto_triage: {
-      enabled: boolean;
-      min_severity: Severity;
-      min_recurrence: number;
-    };
-    alert: {
-      enabled: boolean;
-      severity_threshold: Severity;
-      channels: string[];
-    };
-    retention: {
-      events_days: number;
-      issues_days: number;
-    };
-  };
-  schedules: {
-    daily_brief: {
-      enabled: boolean;
-      time_utc: string;
-      timezone: string;
-      recipients: string[];
-    };
-    weekly_digest: {
-      enabled: boolean;
-      day: string;
-      time_utc: string;
-      timezone: string;
-      recipients: string[];
-    };
-  };
+  owners: AppOwners;
+  policies?: Policy;
+  schedules?: Schedule;
   install_keys?: Record<string, {
     public_key: string;
     server_key: string;
   }>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface IssueCounts {

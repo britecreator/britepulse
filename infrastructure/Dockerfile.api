@@ -52,9 +52,9 @@ COPY --from=builder /app/packages/daily-brief/dist ./packages/daily-brief/dist
 
 # Set environment
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=8080
 
-EXPOSE 3001
+EXPOSE 8080
 
 # Start the API server
 CMD ["node", "packages/api/dist/index.js"]

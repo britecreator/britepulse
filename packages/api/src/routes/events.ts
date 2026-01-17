@@ -62,13 +62,14 @@ router.post(
         // Create event
         const timestamp = eventInput.timestamp || new Date().toISOString();
 
-        // Build event object, excluding undefined values
+        // Build event object
         const event: Omit<Event, 'event_id'> = {
           app_id: appId,
           environment,
           event_type: eventInput.event_type,
           timestamp,
           session_id: eventInput.session_id || uuidv4(),
+          route_or_url: eventInput.route_or_url || 'unknown',
           version: eventInput.version || 'unknown',
           user: {
             user_id: eventInput.user?.user_id || 'anonymous',
@@ -80,9 +81,6 @@ router.post(
         // Only add optional fields if they have values
         if (eventInput.trace_id) {
           event.trace_id = eventInput.trace_id;
-        }
-        if (eventInput.route_or_url) {
-          event.route_or_url = eventInput.route_or_url;
         }
 
         // TODO: Apply redaction to payload before storage
