@@ -12,6 +12,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/api/package.json ./packages/api/
 COPY packages/ai-triage/package.json ./packages/ai-triage/
 COPY packages/daily-brief/package.json ./packages/daily-brief/
+COPY packages/sdk/package.json ./packages/sdk/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -22,6 +23,7 @@ COPY packages/shared ./packages/shared
 COPY packages/api ./packages/api
 COPY packages/ai-triage ./packages/ai-triage
 COPY packages/daily-brief ./packages/daily-brief
+COPY packages/sdk ./packages/sdk
 
 # Build all packages
 RUN pnpm -r build
@@ -40,6 +42,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/api/package.json ./packages/api/
 COPY packages/ai-triage/package.json ./packages/ai-triage/
 COPY packages/daily-brief/package.json ./packages/daily-brief/
+COPY packages/sdk/package.json ./packages/sdk/
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
@@ -49,6 +52,7 @@ COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/api/dist ./packages/api/dist
 COPY --from=builder /app/packages/ai-triage/dist ./packages/ai-triage/dist
 COPY --from=builder /app/packages/daily-brief/dist ./packages/daily-brief/dist
+COPY --from=builder /app/packages/sdk/dist ./packages/sdk/dist
 
 # Set environment
 ENV NODE_ENV=production
