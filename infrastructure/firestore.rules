@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    function isPO() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'PO'];
+    }
+
+    function isEngineer() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'PO', 'Engineer'];
+    }
+
+    function hasAppAccess(appId) {
+      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return userData.role == 'Admin' || appId in userData.app_access;
+    }
+
+    function isValidApiKey(appId, environment) {
+      // API key validation happens at the API layer, not Firestore rules
+      // This is a placeholder for documentation
+      return true;
+    }
+
+    // Apps collection
+    match /apps/{appId} {
+      // Admins can read and write
+      allow read: if isAdmin() || (isAuthenticated() && hasAppAccess(appId));
+      allow create, update, delete: if isAdmin();
+
+      // Install keys subcollection
+      match /install_keys/{envName} {
+        allow read: if isAdmin();
+        allow write: if isAdmin();
+      }
+    }
+
+    // Events collection (ingestion via API, not direct Firestore access)
+    match /events/{eventId} {
+      // Events are created by the API using service account
+      // Console users with app access can read
+      allow read: if isAuthenticated() && hasAppAccess(resource.data.app_id);
+      allow create: if false; // Only via API
+      allow update, delete: if false; // Events are immutable
+    }
+
+    // Issues collection
+    match /issues/{issueId} {
+      // Users with app access can read
+      allow read: if isAuthenticated() && hasAppAccess(resource.data.app_id);
+
+      // Engineers and above can update status/severity/assignment
+      allow update: if isEngineer() && hasAppAccess(resource.data.app_id);
+
+      // Issues are created by the pipeline, not directly
+      allow create: if false;
+      allow delete: if false;
+
+      // AI analyses subcollection
+      match /ai_analyses/{analysisId} {
+        allow read: if isAuthenticated() && hasAppAccess(get(/databases/$(database)/documents/issues/$(issueId)).data.app_id);
+        allow write: if false; // Only via API
+      }
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own data
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+
+      // Only admins can create/update/delete users
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Audit logs collection
+    match /audit_logs/{auditId} {
+      // Admins can read audit logs
+      allow read: if isAdmin();
+
+      // Audit logs are created by the API
+      allow create: if false;
+      allow update, delete: if false; // Audit logs are immutable
+    }
+
+    // Daily briefs collection (stores sent brief records)
+    match /daily_briefs/{briefId} {
+      // POs and above can read briefs for their apps
+      allow read: if isPO() && hasAppAccess(resource.data.app_id);
+
+      // Created by the daily brief service
+      allow write: if false;
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

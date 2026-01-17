@@ -1,0 +1,60 @@
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@9 --activate
+
+# Copy package files
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/api/package.json ./packages/api/
+COPY packages/ai-triage/package.json ./packages/ai-triage/
+COPY packages/daily-brief/package.json ./packages/daily-brief/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY tsconfig.base.json ./
+COPY packages/shared ./packages/shared
+COPY packages/api ./packages/api
+COPY packages/ai-triage ./packages/ai-triage
+COPY packages/daily-brief ./packages/daily-brief
+
+# Build all packages
+RUN pnpm -r build
+
+# Production stage
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@9 --activate
+
+# Copy package files
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/api/package.json ./packages/api/
+COPY packages/ai-triage/package.json ./packages/ai-triage/
+COPY packages/daily-brief/package.json ./packages/daily-brief/
+
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy built files
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/api/dist ./packages/api/dist
+COPY --from=builder /app/packages/ai-triage/dist ./packages/ai-triage/dist
+COPY --from=builder /app/packages/daily-brief/dist ./packages/daily-brief/dist
+
+# Set environment
+ENV NODE_ENV=production
+ENV PORT=3001
+
+EXPOSE 3001
+
+# Start the API server
+CMD ["node", "packages/api/dist/index.js"]

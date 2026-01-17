@@ -1,0 +1,129 @@
+# Cloud Build configuration for BritePulse
+# Builds and deploys API and Console to Cloud Run
+
+substitutions:
+  _REGION: us-central1
+
+steps:
+  # Build API image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-api'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/britepulse-api:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/britepulse-api:latest'
+      - '-f'
+      - 'infrastructure/Dockerfile.api'
+      - '.'
+
+  # Build Console image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-console'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/britepulse-console:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/britepulse-console:latest'
+      - '-f'
+      - 'infrastructure/Dockerfile.console'
+      - '.'
+
+  # Push API image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-api'
+    waitFor: ['build-api']
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/britepulse-api:$COMMIT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    waitFor: ['push-api']
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/britepulse-api:latest'
+
+  # Push Console image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-console'
+    waitFor: ['build-console']
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/britepulse-console:$COMMIT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    waitFor: ['push-console']
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/britepulse-console:latest'
+
+  # Deploy API to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-api'
+    waitFor: ['push-api']
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'britepulse-api'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/britepulse-api:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+  # Deploy Console to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-console'
+    waitFor: ['push-console']
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'britepulse-console'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/britepulse-console:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+  # Deploy Firestore rules
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-firestore-rules'
+    entrypoint: 'gcloud'
+    args:
+      - 'firestore'
+      - 'databases'
+      - 'update'
+      - '--rules'
+      - 'infrastructure/firestore.rules'
+
+  # Deploy Firestore indexes
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-firestore-indexes'
+    entrypoint: 'gcloud'
+    args:
+      - 'firestore'
+      - 'indexes'
+      - 'composite'
+      - 'create'
+      - '--file'
+      - 'infrastructure/firestore.indexes.json'
+
+images:
+  - 'gcr.io/$PROJECT_ID/britepulse-api:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/britepulse-api:latest'
+  - 'gcr.io/$PROJECT_ID/britepulse-console:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/britepulse-console:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+timeout: '1800s'

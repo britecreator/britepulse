@@ -1,0 +1,22 @@
+{
+  "name": "britepulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Intelligent feedback and monitoring system for BriteCo internal web apps",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "dev:api": "pnpm --filter @britepulse/api dev",
+    "dev:console": "pnpm --filter @britepulse/console dev",
+    "test": "pnpm -r test",
+    "test:api": "pnpm --filter @britepulse/api test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r clean"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

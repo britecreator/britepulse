@@ -1,0 +1,91 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: britepulse-api
+  labels:
+    app: britepulse
+    component: api
+spec:
+  template:
+    metadata:
+      annotations:
+        # Auto-scaling settings
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        # Allow up to 100 concurrent requests per instance
+        autoscaling.knative.dev/target: "80"
+        # Cold start optimization
+        run.googleapis.com/startup-cpu-boost: "true"
+    spec:
+      containerConcurrency: 100
+      timeoutSeconds: 300
+      serviceAccountName: britepulse-api@${PROJECT_ID}.iam.gserviceaccount.com
+      containers:
+        - image: gcr.io/${PROJECT_ID}/britepulse-api:latest
+          ports:
+            - containerPort: 3001
+          resources:
+            limits:
+              cpu: "2"
+              memory: "1Gi"
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3001"
+            - name: GCP_PROJECT_ID
+              value: "${PROJECT_ID}"
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: britepulse-secrets
+                  key: google-client-id
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: britepulse-secrets
+                  key: google-client-secret
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: britepulse-secrets
+                  key: session-secret
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: britepulse-secrets
+                  key: anthropic-api-key
+            - name: SENDGRID_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: britepulse-secrets
+                  key: sendgrid-api-key
+            - name: CORS_ORIGIN
+              value: "https://console.britepulse.brite.co"
+            - name: ALLOWED_DOMAIN
+              value: "@brite.co"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3001
+            periodSeconds: 10
+            failureThreshold: 3
+  traffic:
+    - percent: 100
+      latestRevision: true

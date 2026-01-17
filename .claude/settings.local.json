@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(pnpm install:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm build:*)",
+      "Bash(timeout 5 pnpm dev:api:*)",
+      "Bash(node -e:*)",
+      "Bash(pnpm dev:api:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd //c \"taskkill /PID 60800 /F\")",
+      "Bash(timeout:*)",
+      "Bash(cmd //c \"taskkill /PID 72992 /F\")",
+      "Bash(ping:*)",
+      "Bash(cmd /c \"type C:\\\\Users\\\\DustinSitar\\\\Documents\\\\britepulse\\\\service-account.json | findstr project_id\")",
+      "Bash(cmd /c \"cd /d c:\\\\Users\\\\DustinSitar\\\\Documents\\\\britepulse\\\\packages\\\\api && pnpm add firebase-admin\")",
+      "Bash(cmd /c \"cd /d c:\\\\Users\\\\DustinSitar\\\\Documents\\\\britepulse && pnpm add -D firebase-admin --filter @britepulse/api\")",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm run dev:api:*)",
+      "Bash(cmd /c \"taskkill /IM node.exe /F 2>nul & echo done\")",
+      "Bash(curl:*)",
+      "Bash(pnpm dev:console:*)",
+      "Bash(cmd /c \"for /f \"\"tokens=5\"\" %a in \\(''netstat -ano ^| findstr \"\":3000 :3001 :3002\"\"''\\) do @taskkill /F /PID %a 2>nul\")",
+      "Bash(cmd /c \"taskkill /F /PID 46644 & taskkill /F /PID 66824 & taskkill /F /PID 60536 & taskkill /F /PID 22504 & taskkill /F /PID 19568\")",
+      "Bash(cmd /c \"tasklist /FI \"\"PID eq 46644\"\" & tasklist /FI \"\"PID eq 66824\"\" & tasklist /FI \"\"PID eq 60536\"\"\")",
+      "Bash(tasklist:*)",
+      "Bash(cmd /c \"taskkill /F /IM node.exe\")",
+      "Bash(powershell -Command:*)",
+      "Bash(cmd /c \"taskkill /F /PID 40060\")",
+      "Bash(node --version:*)",
+      "Bash(node --env-file=.env -e:*)",
+      "Bash(npx tsx:*)",
+      "Bash(pnpm --filter @britepulse/api dev:*)",
+      "Bash(pnpm:*)",
+      "Bash(git add:*)",
+      "Bash(del \"c:\\\\Users\\\\DustinSitar\\\\Documents\\\\britepulse\\\\nul\")",
+      "Bash(git remote add:*)"
+    ]
+  }
+}
