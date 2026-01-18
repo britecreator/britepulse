@@ -85,6 +85,145 @@ export default function AppDetailPage() {
     navigator.clipboard.writeText(text);
   }
 
+  function downloadIntegrationGuide() {
+    if (!app) return;
+    const prodKey = installKeys?.prod?.public_key || 'KEY_NOT_GENERATED';
+    const stageKey = installKeys?.stage?.public_key;
+    const apiUrl = 'https://britepulse-api-29820647719.us-central1.run.app';
+
+    const guide = `# BritePulse Integration Guide for ${app.name}
+
+## Quick Start
+
+Add this script tag to your HTML \`<head>\`:
+
+\`\`\`html
+<script
+  src="${apiUrl}/sdk.js"
+  data-app-id="${app.app_id}"
+  data-api-url="${apiUrl}"
+  data-environment="production"
+  defer
+></script>
+\`\`\`
+
+## Configuration
+
+| Setting | Value |
+|---------|-------|
+| App ID | \`${app.app_id}\` |
+| API URL | \`${apiUrl}\` |
+| Public Key (prod) | \`${prodKey}\` |
+${stageKey ? `| Public Key (stage) | \`${stageKey}\` |` : ''}
+
+## React Integration
+
+\`\`\`tsx
+// Add to your app's entry point (e.g., main.tsx or App.tsx)
+import { useEffect } from 'react';
+
+declare global {
+  interface Window {
+    BritePulse?: {
+      init: (config: any) => void;
+      setUser: (user: any) => void;
+      captureError: (error: Error, context?: any) => void;
+      openWidget: (options?: any) => void;
+    };
+  }
+}
+
+function App() {
+  useEffect(() => {
+    const initBritePulse = () => {
+      window.BritePulse?.init({
+        appId: '${app.app_id}',
+        apiUrl: '${apiUrl}',
+        environment: 'production',
+      });
+    };
+
+    if (window.BritePulse) {
+      initBritePulse();
+    } else {
+      window.addEventListener('britepulse:ready', initBritePulse);
+      return () => window.removeEventListener('britepulse:ready', initBritePulse);
+    }
+  }, []);
+
+  return <YourApp />;
+}
+\`\`\`
+
+## Error Boundary (Optional)
+
+Capture React errors automatically:
+
+\`\`\`tsx
+import { Component, ErrorInfo, ReactNode } from 'react';
+
+interface Props { children: ReactNode; fallback?: ReactNode; }
+interface State { hasError: boolean; }
+
+export class ErrorBoundary extends Component<Props, State> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    window.BritePulse?.captureError(error, {
+      componentStack: errorInfo.componentStack,
+    });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || <div>Something went wrong</div>;
+    }
+    return this.props.children;
+  }
+}
+\`\`\`
+
+## API Methods
+
+\`\`\`typescript
+// Update user after login
+window.BritePulse?.setUser({ userId: user.id, email: user.email });
+
+// Manual error capture
+window.BritePulse?.captureError(error, { context: 'checkout' });
+
+// Open feedback widget
+window.BritePulse?.openWidget();
+window.BritePulse?.openWidget({ type: 'bug' }); // Pre-select type
+\`\`\`
+
+## Staging Environment
+
+To use staging instead of production, change:
+- \`data-environment="staging"\`
+${stageKey ? `- Use public key: \`${stageKey}\`` : '- Generate staging keys in the BritePulse console'}
+
+---
+
+**Console:** https://britepulse-console-29820647719.us-central1.run.app
+**App ID:** ${app.app_id}
+`;
+
+    const blob = new Blob([guide], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `britepulse-integration-${app.name.toLowerCase().replace(/\s+/g, '-')}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -101,6 +240,15 @@ export default function AppDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">{app.name}</h1>
           <p className="mt-1 text-sm text-gray-500">ID: {app.app_id}</p>
         </div>
+        <button
+          onClick={downloadIntegrationGuide}
+          className="btn-primary flex items-center gap-2"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Download Integration Guide
+        </button>
       </div>
 
       {/* Environments Section */}
