@@ -1,5 +1,5 @@
 # GitHub Actions workflow for auto-deploying BritePulse to Cloud Run
-# Triggers on push to main branch
+# Triggers on push to master branch
 # Requires these secrets in GitHub:
 #   - GCP_PROJECT_ID: britecreations
 #   - GCP_SA_KEY: JSON key for a service account with Cloud Run and Artifact Registry permissions
@@ -9,7 +9,7 @@ name: Deploy to Cloud Run
 on:
   push:
     branches:
-      - main
+      - master
 
 env:
   PROJECT_ID: britecreations
