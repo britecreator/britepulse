@@ -76,6 +76,18 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
+            --set-env-vars "NODE_ENV=production" \
+            --set-env-vars "GCP_PROJECT_ID=${{ env.PROJECT_ID }}" \
+            --set-env-vars "ALLOWED_DOMAIN=brite.co" \
+            --set-env-vars "CONSOLE_BASE_URL=https://britepulse-console-29820647719.us-central1.run.app" \
+            --set-env-vars "SENDGRID_FROM_EMAIL=marketing@brite.co" \
+            --set-env-vars "CORS_ORIGIN=https://britepulse-console-29820647719.us-central1.run.app" \
+            --set-secrets "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest" \
+            --set-secrets "GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest" \
+            --set-secrets "SESSION_SECRET=SESSION_SECRET:latest" \
+            --set-secrets "SENDGRID_API_KEY=SENDGRID_API_KEY:latest" \
+            --set-secrets "ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
+            --set-secrets "SCHEDULER_AUTH_TOKEN=SCHEDULER_AUTH_TOKEN:latest" \
             --quiet
 
       - name: Deploy Console to Cloud Run

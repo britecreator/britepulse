@@ -30,6 +30,9 @@ export const config = {
   sendgridApiKey: process.env.SENDGRID_API_KEY || '',
   sendgridFromEmail: process.env.SENDGRID_FROM_EMAIL || 'britepulse@brite.co',
 
+  // Scheduler authentication (for Cloud Scheduler to trigger daily briefs)
+  schedulerAuthToken: process.env.SCHEDULER_AUTH_TOKEN || '',
+
   // Console URL (for links in emails)
   consoleBaseUrl: process.env.CONSOLE_BASE_URL || 'http://localhost:3000',
 

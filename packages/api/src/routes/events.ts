@@ -10,6 +10,7 @@ import { schemas, type Event } from '@britepulse/shared';
 import { config } from '../config.js';
 import { asyncHandler, APIError, apiKeyAuth } from '../middleware/index.js';
 import * as firestoreService from '../services/firestore.js';
+import { processEvent } from '../services/pipeline.js';
 
 const router: IRouter = Router();
 
@@ -83,12 +84,9 @@ router.post(
           event.trace_id = eventInput.trace_id;
         }
 
-        // TODO: Apply redaction to payload before storage
-        // TODO: Generate fingerprint for error events
-        // TODO: Process through pipeline (dedupe, grouping, etc.)
-
-        const created = await firestoreService.createEvent(event);
-        accepted.push(created.event_id);
+        // Process through pipeline (redaction, fingerprinting, issue grouping)
+        const result = await processEvent(event);
+        accepted.push(result.event.event_id);
       } catch (error) {
         rejected.push({
           index: i,

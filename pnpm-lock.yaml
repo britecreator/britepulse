@@ -38,6 +38,12 @@ importers:
 
   packages/api:
     dependencies:
+      '@britepulse/ai-triage':
+        specifier: workspace:*
+        version: link:../ai-triage
+      '@britepulse/daily-brief':
+        specifier: workspace:*
+        version: link:../daily-brief
       '@britepulse/shared':
         specifier: workspace:*
         version: link:../shared

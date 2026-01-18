@@ -148,7 +148,14 @@ export function generateHtmlEmail(data: BriefData): string {
     ${
       data.issues.length > 0
         ? issuesHtml
-        : '<p style="color: #6B7280; text-align: center; padding: 24px;">No priority issues to report.</p>'
+        : `<div style="text-align: center; padding: 40px 20px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">&#127881;</div>
+            <h3 style="margin: 0 0 8px 0; color: #16A34A; font-size: 20px;">All Clear!</h3>
+            <p style="margin: 0; color: #6B7280; font-size: 14px;">
+              No priority issues to report for the last 24 hours.
+              <br/>Your application is running smoothly.
+            </p>
+          </div>`
     }
   </div>
 
@@ -194,7 +201,10 @@ export function generateTextEmail(data: BriefData): string {
   ];
 
   if (data.issues.length === 0) {
-    lines.push(`No priority issues to report.`);
+    lines.push(``);
+    lines.push(`🎉 ALL CLEAR!`);
+    lines.push(`No priority issues to report for the last 24 hours.`);
+    lines.push(`Your application is running smoothly.`);
   } else {
     for (const ranked of data.issues) {
       const issue = ranked.issue;
@@ -242,6 +252,8 @@ export function generateSubject(data: BriefData): string {
     parts.push(`${highCount} High Priority`);
   } else if (stats.newIssues24h > 0) {
     parts.push(`${stats.newIssues24h} New Issues`);
+  } else if (issues.length === 0) {
+    parts.push(`All Clear ✓`);
   } else {
     parts.push(`Daily Brief`);
   }

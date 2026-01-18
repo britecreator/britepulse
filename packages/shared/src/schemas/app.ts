@@ -77,6 +77,8 @@ export const PolicySchema = z.object({
   }),
 });
 
+export const BriefModeSchema = z.enum(['daily', 'only_on_issues']);
+
 export const ScheduleSchema = z.object({
   daily_brief_time_local: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
     message: 'Must be in HH:MM format',
@@ -85,6 +87,7 @@ export const ScheduleSchema = z.object({
   daily_brief_max_items: z.number().int().min(1).max(50).default(10),
   daily_brief_min_items: z.number().int().min(1).max(50).default(5),
   daily_brief_recipients: z.array(z.string().email()),
+  brief_mode: BriefModeSchema.optional().default('daily'),
 });
 
 export const AppOwnersSchema = z.object({

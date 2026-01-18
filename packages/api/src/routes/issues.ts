@@ -17,6 +17,8 @@ import {
   logAuditAction,
 } from '../middleware/index.js';
 import * as firestoreService from '../services/firestore.js';
+import { generateContextFile, generateContextJSON } from '../services/context-generator.js';
+import { config } from '../config.js';
 
 const router: IRouter = Router();
 
@@ -401,6 +403,114 @@ router.get(
         returned: events.length,
       },
     });
+  })
+);
+
+/**
+ * GET /issues/:issue_id/context
+ * Generate AI context file for external AI agent consumption
+ * Returns markdown (default) or JSON format
+ */
+router.get(
+  '/:issue_id/context',
+  requirePermission('view_issue_detail'),
+  asyncHandler(async (req, res) => {
+    const { issue_id } = req.params;
+    const format = (req.query.format as string) || 'markdown';
+
+    const issue = await firestoreService.getIssue(issue_id);
+    if (!issue) {
+      throw APIError.notFound('Issue');
+    }
+
+    // Check app access
+    const accessibleAppIds = getAccessibleAppIds(req);
+    if (accessibleAppIds && !accessibleAppIds.includes(issue.app_id)) {
+      throw APIError.forbidden('Access to this issue is denied');
+    }
+
+    // Get events and app
+    const events = await firestoreService.getEventsByIssue(issue_id, 20);
+    const app = await firestoreService.getApp(issue.app_id);
+
+    if (!app) {
+      throw APIError.notFound('App');
+    }
+
+    const contextData = { issue, events, app };
+
+    // Log context download
+    await logAuditAction(req, 'download_context', 'issue', issue_id, {
+      format,
+    });
+
+    if (format === 'json') {
+      res.json({ data: generateContextJSON(contextData) });
+    } else {
+      const markdown = generateContextFile(contextData);
+      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="issue-${issue_id}-context.md"`
+      );
+      res.send(markdown);
+    }
+  })
+);
+
+/**
+ * POST /issues/:issue_id/actions/triage
+ * Manually trigger AI triage analysis
+ */
+router.post(
+  '/:issue_id/actions/triage',
+  requirePermission('change_status'),
+  asyncHandler(async (req, res) => {
+    const { issue_id } = req.params;
+    const { force = false } = req.body;
+
+    const issue = await firestoreService.getIssue(issue_id);
+    if (!issue) {
+      throw APIError.notFound('Issue');
+    }
+
+    // Check app access
+    const accessibleAppIds = getAccessibleAppIds(req);
+    if (accessibleAppIds && !accessibleAppIds.includes(issue.app_id)) {
+      throw APIError.forbidden('Access to this issue is denied');
+    }
+
+    // Check if AI triage is configured
+    if (!config.anthropicApiKey) {
+      throw APIError.badRequest('AI triage is not configured on this server');
+    }
+
+    // Lazy load AI triage module
+    const aiTriage = await import('@britepulse/ai-triage');
+    aiTriage.initClient(config.anthropicApiKey);
+
+    // Get events and app
+    const events = await firestoreService.getEventsByIssue(issue_id, 20);
+    const app = await firestoreService.getApp(issue.app_id);
+
+    // Run triage
+    const result = await aiTriage.runTriage(issue, events, app?.name || 'Unknown', {
+      force,
+    });
+
+    if (result.success && result.analysis) {
+      // Store analysis on issue
+      await firestoreService.updateIssue(issue_id, {
+        ai_analysis: result.analysis,
+      });
+
+      await logAuditAction(req, 'run_triage', 'issue', issue_id, {
+        analysis_id: result.analysis.analysis_id,
+        confidence: result.analysis.confidence,
+      });
+    }
+
+    res.json({ data: result });
   })
 );
 

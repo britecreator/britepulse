@@ -21,6 +21,7 @@ export interface IssueCounts {
 export interface IssueTimestamps {
   created_at: string; // ISO timestamp
   last_seen_at: string; // ISO timestamp
+  resolved_at?: string; // ISO timestamp, set when status becomes 'resolved'
 }
 
 /**
@@ -82,7 +83,8 @@ export interface IssueUpdateInput {
   severity?: Severity;
   assigned_to?: string;
   tags?: string[];
-  reason: string; // required for audit
+  ai_analysis?: AIAnalysis; // updated when AI triage runs
+  reason?: string; // required for audit (optional for AI updates)
 }
 
 /**

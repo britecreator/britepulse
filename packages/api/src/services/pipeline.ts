@@ -7,6 +7,32 @@ import type { Event, Issue, IssueInput, EventType, RedactionProfile } from '@bri
 import { redactObject } from './redaction.js';
 import { generateFingerprint, extractFingerprintInput } from './fingerprint.js';
 import * as firestoreService from './firestore.js';
+import { config } from '../config.js';
+
+// Lazy load AI triage to avoid startup issues if not configured
+let aiTriageInitialized = false;
+let aiTriageModule: typeof import('@britepulse/ai-triage') | null = null;
+
+async function initAITriage(): Promise<typeof import('@britepulse/ai-triage') | null> {
+  if (aiTriageInitialized) return aiTriageModule;
+
+  aiTriageInitialized = true;
+
+  if (!config.anthropicApiKey) {
+    console.log('[Pipeline] AI triage disabled - no ANTHROPIC_API_KEY configured');
+    return null;
+  }
+
+  try {
+    aiTriageModule = await import('@britepulse/ai-triage');
+    aiTriageModule.initClient(config.anthropicApiKey);
+    console.log('[Pipeline] AI triage initialized');
+    return aiTriageModule;
+  } catch (error) {
+    console.warn('[Pipeline] Failed to initialize AI triage:', error);
+    return null;
+  }
+}
 
 /**
  * Pipeline processing result
@@ -82,6 +108,11 @@ export async function processEvent(
     issue = await createIssueFromEvent(event, null);
     isNewIssue = true;
   }
+
+  // Step 5: Check for AI triage eligibility (async, non-blocking)
+  maybeRunAITriage(issue, event).catch((error) => {
+    console.error('[Pipeline] AI triage error:', error);
+  });
 
   return {
     event,
@@ -242,4 +273,50 @@ export async function processBatch(
   }
 
   return results;
+}
+
+/**
+ * Check if an issue is eligible for AI triage and run it if so
+ * This runs asynchronously and doesn't block event ingestion
+ */
+async function maybeRunAITriage(issue: Issue, event: Event): Promise<void> {
+  // Only run for error events (not feedback)
+  if (event.event_type !== 'frontend_error' && event.event_type !== 'backend_error') {
+    return;
+  }
+
+  const aiTriage = await initAITriage();
+  if (!aiTriage) return;
+
+  // Check eligibility
+  const eligibility = aiTriage.isEligibleForTriage(issue);
+  if (!eligibility.eligible) {
+    return;
+  }
+
+  console.log(`[Pipeline] Issue ${issue.issue_id} eligible for AI triage: running analysis`);
+
+  // Get events for this issue
+  const events = await firestoreService.getEventsByIssue(issue.issue_id, 10);
+
+  // Get app name
+  const app = await firestoreService.getApp(issue.app_id);
+  const appName = app?.name || 'Unknown App';
+
+  // Run triage
+  const result = await aiTriage.runTriage(issue, events, appName, {
+    force: false,
+  });
+
+  if (result.success && result.analysis) {
+    // Store analysis on issue
+    await firestoreService.updateIssue(issue.issue_id, {
+      ai_analysis: result.analysis,
+    });
+    console.log(`[Pipeline] AI analysis stored for issue ${issue.issue_id}`);
+  } else if (result.skipped_reason) {
+    console.log(`[Pipeline] AI triage skipped: ${result.skipped_reason}`);
+  } else if (result.error) {
+    console.error(`[Pipeline] AI triage failed: ${result.error}`);
+  }
 }

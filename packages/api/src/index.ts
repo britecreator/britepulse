@@ -22,6 +22,7 @@ import {
   adminRoutes,
   issuesRoutes,
   usersRoutes,
+  briefsRoutes,
 } from './routes/index.js';
 
 // Validate configuration
@@ -94,11 +95,7 @@ app.use('/events', eventsRoutes);
 app.use('/admin', adminRoutes);
 app.use('/admin/users', usersRoutes);
 app.use('/issues', issuesRoutes);
-
-// Placeholder route (to be implemented)
-app.use('/briefs', (_req, res) => {
-  res.status(501).json({ error: { code: 'NOT_IMPLEMENTED', message: 'Coming soon' } });
-});
+app.use('/briefs', briefsRoutes);
 
 // 404 handler
 app.use((_req, res) => {

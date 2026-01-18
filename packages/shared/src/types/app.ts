@@ -77,6 +77,11 @@ export interface Policy {
 }
 
 /**
+ * Brief mode: when to send daily brief emails
+ */
+export type BriefMode = 'daily' | 'only_on_issues';
+
+/**
  * Schedule configuration (Section 4.6)
  */
 export interface Schedule {
@@ -85,6 +90,7 @@ export interface Schedule {
   daily_brief_max_items: number; // default: 10
   daily_brief_min_items: number; // default: 5
   daily_brief_recipients: string[]; // default: owners.po_emails
+  brief_mode?: BriefMode; // 'daily' = always send, 'only_on_issues' = skip if no active issues
 }
 
 /**

@@ -64,7 +64,16 @@
       "Bash(gcloud beta builds connections list:*)",
       "Bash(gcloud iam service-accounts create:*)",
       "Bash(gcloud projects add-iam-policy-binding:*)",
-      "Bash(gcloud iam service-accounts keys create:*)"
+      "Bash(gcloud iam service-accounts keys create:*)",
+      "Bash(gh run list:*)",
+      "Bash(npx firebase deploy:*)",
+      "Bash(gcloud firestore indexes composite list:*)",
+      "Bash(find:*)",
+      "Bash(npx tsc)",
+      "Bash(npx tsc:*)",
+      "Bash(echo:*)",
+      "Bash(ls:*)",
+      "Bash(openssl rand:*)"
     ]
   }
 }
