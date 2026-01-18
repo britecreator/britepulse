@@ -31,13 +31,22 @@ function initializeFirebase(): void {
   const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   console.log('[Firebase] Initializing with:', {
     projectId: config.gcpProjectId,
-    keyFilename: keyFile,
+    keyFilename: keyFile || '(using application default credentials)',
   });
 
-  admin.initializeApp({
-    credential: admin.credential.cert(keyFile as string),
-    projectId: config.gcpProjectId,
-  });
+  // Use Application Default Credentials in Cloud Run (no key file needed)
+  // Fall back to key file for local development
+  if (keyFile) {
+    admin.initializeApp({
+      credential: admin.credential.cert(keyFile),
+      projectId: config.gcpProjectId,
+    });
+  } else {
+    // Cloud Run provides credentials automatically via metadata server
+    admin.initializeApp({
+      projectId: config.gcpProjectId,
+    });
+  }
 
   initialized = true;
   console.log('[Firebase] Initialized successfully');
@@ -530,6 +539,23 @@ export async function updateUser(userId: string, updates: Partial<UserInput>): P
 
   const updated = await docRef.get();
   return updated.data() as User;
+}
+
+export async function getAllUsers(): Promise<User[]> {
+  const firestore = getFirestore();
+  const snapshot = await firestore.collection(COLLECTIONS.users).orderBy('email').get();
+  return snapshot.docs.map((doc) => doc.data() as User);
+}
+
+export async function deleteUser(userId: string): Promise<boolean> {
+  const firestore = getFirestore();
+  const docRef = firestore.collection(COLLECTIONS.users).doc(userId);
+
+  const doc = await docRef.get();
+  if (!doc.exists) return false;
+
+  await docRef.delete();
+  return true;
 }
 
 // ============ Validation Helpers ============

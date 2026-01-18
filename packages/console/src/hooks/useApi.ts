@@ -183,3 +183,62 @@ export function useMergeIssues() {
     },
   });
 }
+
+// Users
+interface User {
+  user_id: string;
+  email: string;
+  name?: string;
+  role: 'Admin' | 'PO' | 'Engineer' | 'ReadOnly';
+  app_access: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export function useUsers() {
+  return useQuery({
+    queryKey: ['users'],
+    queryFn: () => fetchApi<{ data: User[] }>('/admin/users').then((r) => r.data),
+  });
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { email: string; name?: string; role: User['role']; app_access?: string[] }) =>
+      fetchApi<{ data: User }>('/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useUpdateUser(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name?: string; role?: User['role']; app_access?: string[] }) =>
+      fetchApi<{ data: User }>(`/admin/users/${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      fetchApi<{ data: { success: boolean } }>(`/admin/users/${userId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}

@@ -36,7 +36,7 @@ export type NextAction =
   | 'monitor_only';
 
 // Audit log target types (Section 4.10)
-export type AuditTargetType = 'app' | 'issue' | 'event' | 'attachment';
+export type AuditTargetType = 'app' | 'issue' | 'event' | 'attachment' | 'user';
 
 // Environment names
 export type Environment = 'prod' | 'stage' | 'dev' | string;

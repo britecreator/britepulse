@@ -16,6 +16,7 @@ build/
 service-account.json
 *-service-account.json
 *.credentials.json
+github-deploy-key.json
 
 # IDE
 .idea/

@@ -1,0 +1,40 @@
+# Cloud Build configuration for API only
+# Just builds and pushes the API image without deployment
+
+steps:
+  # Build API image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-api'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/britepulse/api:$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/britepulse/api:latest'
+      - '-f'
+      - 'infrastructure/Dockerfile.api'
+      - '.'
+
+  # Push API image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-api'
+    waitFor: ['build-api']
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/britepulse/api:$COMMIT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    waitFor: ['push-api']
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/britepulse/api:latest'
+
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/britepulse/api:$COMMIT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/britepulse/api:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+timeout: '900s'

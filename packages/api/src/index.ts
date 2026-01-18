@@ -21,6 +21,7 @@ import {
   eventsRoutes,
   adminRoutes,
   issuesRoutes,
+  usersRoutes,
 } from './routes/index.js';
 
 // Validate configuration
@@ -91,6 +92,7 @@ app.use('/health', healthRoutes);
 app.use('/auth', authRoutes);
 app.use('/events', eventsRoutes);
 app.use('/admin', adminRoutes);
+app.use('/admin/users', usersRoutes);
 app.use('/issues', issuesRoutes);
 
 // Placeholder route (to be implemented)

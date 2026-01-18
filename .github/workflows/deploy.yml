@@ -1,0 +1,93 @@
+# GitHub Actions workflow for auto-deploying BritePulse to Cloud Run
+# Triggers on push to main branch
+# Requires these secrets in GitHub:
+#   - GCP_PROJECT_ID: britecreations
+#   - GCP_SA_KEY: JSON key for a service account with Cloud Run and Artifact Registry permissions
+
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: britecreations
+  REGION: us-central1
+  ARTIFACT_REPO: us-central1-docker.pkg.dev/britecreations/britepulse
+  API_SERVICE: britepulse-api
+  CONSOLE_SERVICE: britepulse-console
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build API image
+        run: |
+          docker build \
+            -t ${{ env.ARTIFACT_REPO }}/api:${{ github.sha }} \
+            -t ${{ env.ARTIFACT_REPO }}/api:latest \
+            -f infrastructure/Dockerfile.api \
+            .
+
+      - name: Build Console image
+        run: |
+          docker build \
+            -t ${{ env.ARTIFACT_REPO }}/console:${{ github.sha }} \
+            -t ${{ env.ARTIFACT_REPO }}/console:latest \
+            --build-arg VITE_API_URL=https://britepulse-api-29820647719.us-central1.run.app \
+            -f infrastructure/Dockerfile.console \
+            .
+
+      - name: Push API image
+        run: |
+          docker push ${{ env.ARTIFACT_REPO }}/api:${{ github.sha }}
+          docker push ${{ env.ARTIFACT_REPO }}/api:latest
+
+      - name: Push Console image
+        run: |
+          docker push ${{ env.ARTIFACT_REPO }}/console:${{ github.sha }}
+          docker push ${{ env.ARTIFACT_REPO }}/console:latest
+
+      - name: Deploy API to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.API_SERVICE }} \
+            --image ${{ env.ARTIFACT_REPO }}/api:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --quiet
+
+      - name: Deploy Console to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.CONSOLE_SERVICE }} \
+            --image ${{ env.ARTIFACT_REPO }}/console:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --quiet
+
+      - name: Show deployment URLs
+        run: |
+          echo "API: https://britepulse-api-29820647719.us-central1.run.app"
+          echo "Console: https://britepulse-console-29820647719.us-central1.run.app"

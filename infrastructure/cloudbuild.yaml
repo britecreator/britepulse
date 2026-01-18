@@ -1,8 +1,10 @@
 # Cloud Build configuration for BritePulse
 # Builds and deploys API and Console to Cloud Run
+# Triggered automatically on push to main branch
 
 substitutions:
   _REGION: us-central1
+  _ARTIFACT_REPO: us-central1-docker.pkg.dev/britecreations/britepulse
 
 steps:
   # Build API image
@@ -11,55 +13,47 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/britepulse-api:$COMMIT_SHA'
+      - '${_ARTIFACT_REPO}/api:$SHORT_SHA'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/britepulse-api:latest'
+      - '${_ARTIFACT_REPO}/api:latest'
       - '-f'
       - 'infrastructure/Dockerfile.api'
       - '.'
 
-  # Build Console image
+  # Build Console image with production API URL baked in
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-console'
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/britepulse-console:$COMMIT_SHA'
+      - '${_ARTIFACT_REPO}/console:$SHORT_SHA'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/britepulse-console:latest'
+      - '${_ARTIFACT_REPO}/console:latest'
+      - '--build-arg'
+      - 'VITE_API_URL=https://britepulse-api-29820647719.us-central1.run.app'
       - '-f'
       - 'infrastructure/Dockerfile.console'
       - '.'
 
-  # Push API image
+  # Push API image (both tags in parallel)
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-api'
     waitFor: ['build-api']
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/britepulse-api:$COMMIT_SHA'
+      - '--all-tags'
+      - '${_ARTIFACT_REPO}/api'
 
-  - name: 'gcr.io/cloud-builders/docker'
-    waitFor: ['push-api']
-    args:
-      - 'push'
-      - 'gcr.io/$PROJECT_ID/britepulse-api:latest'
-
-  # Push Console image
+  # Push Console image (both tags in parallel)
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-console'
     waitFor: ['build-console']
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/britepulse-console:$COMMIT_SHA'
+      - '--all-tags'
+      - '${_ARTIFACT_REPO}/console'
 
-  - name: 'gcr.io/cloud-builders/docker'
-    waitFor: ['push-console']
-    args:
-      - 'push'
-      - 'gcr.io/$PROJECT_ID/britepulse-console:latest'
-
-  # Deploy API to Cloud Run
+  # Deploy API to Cloud Run (preserves existing env vars)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-api'
     waitFor: ['push-api']
@@ -69,7 +63,7 @@ steps:
       - 'deploy'
       - 'britepulse-api'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/britepulse-api:$COMMIT_SHA'
+      - '${_ARTIFACT_REPO}/api:$SHORT_SHA'
       - '--region'
       - '${_REGION}'
       - '--platform'
@@ -86,41 +80,18 @@ steps:
       - 'deploy'
       - 'britepulse-console'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/britepulse-console:$COMMIT_SHA'
+      - '${_ARTIFACT_REPO}/console:$SHORT_SHA'
       - '--region'
       - '${_REGION}'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
 
-  # Deploy Firestore rules
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'deploy-firestore-rules'
-    entrypoint: 'gcloud'
-    args:
-      - 'firestore'
-      - 'databases'
-      - 'update'
-      - '--rules'
-      - 'infrastructure/firestore.rules'
-
-  # Deploy Firestore indexes
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'deploy-firestore-indexes'
-    entrypoint: 'gcloud'
-    args:
-      - 'firestore'
-      - 'indexes'
-      - 'composite'
-      - 'create'
-      - '--file'
-      - 'infrastructure/firestore.indexes.json'
-
 images:
-  - 'gcr.io/$PROJECT_ID/britepulse-api:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/britepulse-api:latest'
-  - 'gcr.io/$PROJECT_ID/britepulse-console:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/britepulse-console:latest'
+  - '${_ARTIFACT_REPO}/api:$SHORT_SHA'
+  - '${_ARTIFACT_REPO}/api:latest'
+  - '${_ARTIFACT_REPO}/console:$SHORT_SHA'
+  - '${_ARTIFACT_REPO}/console:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY

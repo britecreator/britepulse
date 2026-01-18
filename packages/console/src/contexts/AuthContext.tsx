@@ -17,9 +17,9 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// Direct API calls to bypass Vite proxy issues
-const API_BASE = 'http://localhost:3002';
-const AUTH_BASE = 'http://localhost:3002';
+// API base URL - use VITE_API_URL in production, localhost in dev
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+const AUTH_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
 const TOKEN_KEY = 'britepulse_token';
 

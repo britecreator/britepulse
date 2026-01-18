@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AppsListPage from './pages/admin/AppsListPage';
 import AppDetailPage from './pages/admin/AppDetailPage';
+import UsersPage from './pages/admin/UsersPage';
 import IssuesListPage from './pages/issues/IssuesListPage';
 import IssueDetailPage from './pages/issues/IssueDetailPage';
 
@@ -65,6 +66,14 @@ export default function App() {
           element={
             <AdminRoute>
               <AppDetailPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="admin/users"
+          element={
+            <AdminRoute>
+              <UsersPage />
             </AdminRoute>
           }
         />

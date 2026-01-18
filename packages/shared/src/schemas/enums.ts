@@ -31,6 +31,6 @@ export const NextActionSchema = z.enum([
   'monitor_only',
 ]);
 
-export const AuditTargetTypeSchema = z.enum(['app', 'issue', 'event', 'attachment']);
+export const AuditTargetTypeSchema = z.enum(['app', 'issue', 'event', 'attachment', 'user']);
 
 export const EnvironmentSchema = z.string().min(1);

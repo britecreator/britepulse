@@ -36,6 +36,10 @@ export class APIError extends Error {
     return new APIError(HTTP_STATUS.NOT_FOUND, 'NOT_FOUND', `${resource} not found`);
   }
 
+  static conflict(message: string): APIError {
+    return new APIError(HTTP_STATUS.CONFLICT, 'CONFLICT', message);
+  }
+
   static tooManyRequests(message = 'Rate limit exceeded'): APIError {
     return new APIError(HTTP_STATUS.TOO_MANY_REQUESTS, 'RATE_LIMITED', message);
   }

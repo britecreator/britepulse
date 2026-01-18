@@ -83,12 +83,24 @@ export const IssueActionPayloadSchema = z.object({
   request_info_message: z.string().optional(),
 });
 
+// Helper to parse comma-separated values from query strings (e.g., "new,triaged" -> ["new", "triaged"])
+const commaSeparatedArray = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess(
+    (val) => {
+      if (Array.isArray(val)) return val;
+      if (typeof val === 'string' && val.includes(',')) return val.split(',');
+      if (typeof val === 'string') return [val];
+      return val;
+    },
+    z.array(schema).optional()
+  );
+
 export const IssueFiltersSchema = z.object({
   app_id: z.string().optional(),
   environment: EnvironmentSchema.optional(),
-  status: z.union([IssueStatusSchema, z.array(IssueStatusSchema)]).optional(),
-  severity: z.union([SeveritySchema, z.array(SeveritySchema)]).optional(),
-  issue_type: z.union([IssueTypeSchema, z.array(IssueTypeSchema)]).optional(),
+  status: commaSeparatedArray(IssueStatusSchema),
+  severity: commaSeparatedArray(SeveritySchema),
+  issue_type: commaSeparatedArray(IssueTypeSchema),
   assigned_to: z.string().optional(),
   tag: z.string().optional(),
   version: z.string().optional(),
