@@ -38,6 +38,10 @@ if (configErrors.length > 0) {
 // Create Express app
 const app = express();
 
+// Trust proxy (required for Cloud Run / load balancers)
+// This allows express-rate-limit to get the real client IP
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: config.nodeEnv === 'production' ? undefined : false, // Disable CSP in dev for test page
