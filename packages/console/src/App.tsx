@@ -54,10 +54,12 @@ export default function App() {
   const { user, isAuthenticated } = useAuth();
 
   // Initialize BritePulse and set user context
+  // Note: SDK auto-initializes from script tag data attributes, but we call init
+  // again here to ensure it's ready and to enable debug mode if needed
   useEffect(() => {
     const initBritePulse = () => {
       window.BritePulse?.init({
-        appId: '0410caf0-1276-4782-82d7-aec5140f946f',
+        apiKey: 'pk_0410caf0-1276-4782-82d7-aec5140f946f_c33c98737690464d8d9827fa1bf1c581',
         apiUrl: 'https://britepulse-api-29820647719.us-central1.run.app',
         environment: 'production',
       });

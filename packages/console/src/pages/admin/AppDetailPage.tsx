@@ -100,7 +100,7 @@ Add this script tag to your HTML \`<head>\`:
 \`\`\`html
 <script
   src="${apiUrl}/sdk.js"
-  data-app-id="${app.app_id}"
+  data-api-key="${prodKey}"
   data-api-url="${apiUrl}"
   data-environment="production"
   defer
@@ -137,7 +137,7 @@ function App() {
   useEffect(() => {
     const initBritePulse = () => {
       window.BritePulse?.init({
-        appId: '${app.app_id}',
+        apiKey: '${prodKey}',
         apiUrl: '${apiUrl}',
         environment: 'production',
       });
