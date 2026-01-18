@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
@@ -8,6 +9,18 @@ import AppDetailPage from './pages/admin/AppDetailPage';
 import UsersPage from './pages/admin/UsersPage';
 import IssuesListPage from './pages/issues/IssuesListPage';
 import IssueDetailPage from './pages/issues/IssueDetailPage';
+
+// BritePulse SDK type declaration
+declare global {
+  interface Window {
+    BritePulse?: {
+      init: (config: any) => void;
+      setUser: (user: any) => void;
+      captureError: (error: Error, context?: any) => void;
+      openWidget: (options?: any) => void;
+    };
+  }
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -38,6 +51,36 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const { user, isAuthenticated } = useAuth();
+
+  // Initialize BritePulse and set user context
+  useEffect(() => {
+    const initBritePulse = () => {
+      window.BritePulse?.init({
+        appId: '0410caf0-1276-4782-82d7-aec5140f946f',
+        apiUrl: 'https://britepulse-api-29820647719.us-central1.run.app',
+        environment: 'production',
+      });
+    };
+
+    if (window.BritePulse) {
+      initBritePulse();
+    } else {
+      window.addEventListener('britepulse:ready', initBritePulse);
+      return () => window.removeEventListener('britepulse:ready', initBritePulse);
+    }
+  }, []);
+
+  // Update BritePulse user context when authentication changes
+  useEffect(() => {
+    if (isAuthenticated && user && window.BritePulse) {
+      window.BritePulse.setUser({
+        userId: user.user_id,
+        email: user.email,
+      });
+    }
+  }, [isAuthenticated, user]);
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
