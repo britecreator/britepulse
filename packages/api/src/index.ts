@@ -75,14 +75,16 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// Serve SDK files
+// Serve SDK files - must set CORP header to allow cross-origin loading as scripts
 const sdkPath = path.resolve(__dirname, '../../sdk/dist');
 app.get('/sdk.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.sendFile(path.join(sdkPath, 'britepulse.umd.js'));
 });
 app.get('/sdk.esm.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.sendFile(path.join(sdkPath, 'britepulse.es.js'));
 });
 
