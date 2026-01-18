@@ -19,7 +19,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Send error to BritePulse
-    window.BritePulse?.captureError(error, {
+    const instance = window.BritePulse?.getInstance();
+    instance?.captureError(error, {
       componentStack: errorInfo.componentStack,
     });
 

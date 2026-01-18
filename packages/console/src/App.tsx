@@ -14,10 +14,11 @@ import IssueDetailPage from './pages/issues/IssueDetailPage';
 declare global {
   interface Window {
     BritePulse?: {
-      init: (config: any) => void;
-      setUser: (user: any) => void;
-      captureError: (error: Error, context?: any) => void;
-      openWidget: (options?: any) => void;
+      init: (config: any) => any;
+      getInstance: () => {
+        setUser?: (user: any) => void;
+        captureError: (error: Error, context?: any) => void;
+      } | null;
     };
   }
 }
@@ -53,30 +54,12 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const { user, isAuthenticated } = useAuth();
 
-  // Initialize BritePulse and set user context
-  // Note: SDK auto-initializes from script tag data attributes, but we call init
-  // again here to ensure it's ready and to enable debug mode if needed
-  useEffect(() => {
-    const initBritePulse = () => {
-      window.BritePulse?.init({
-        apiKey: 'pk_0410caf0-1276-4782-82d7-aec5140f946f_c33c98737690464d8d9827fa1bf1c581',
-        apiUrl: 'https://britepulse-api-29820647719.us-central1.run.app',
-        environment: 'production',
-      });
-    };
-
-    if (window.BritePulse) {
-      initBritePulse();
-    } else {
-      window.addEventListener('britepulse:ready', initBritePulse);
-      return () => window.removeEventListener('britepulse:ready', initBritePulse);
-    }
-  }, []);
-
   // Update BritePulse user context when authentication changes
+  // Note: SDK auto-initializes from script tag data attributes
   useEffect(() => {
-    if (isAuthenticated && user && window.BritePulse) {
-      window.BritePulse.setUser({
+    if (isAuthenticated && user) {
+      const instance = window.BritePulse?.getInstance();
+      instance?.setUser?.({
         userId: user.user_id,
         email: user.email,
       });
