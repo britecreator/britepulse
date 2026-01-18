@@ -117,7 +117,9 @@ export function useIssues(filters: Partial<IssueFilters> = {}) {
   return useQuery({
     queryKey: ['issues', filters],
     queryFn: () =>
-      fetchApi<{ issues: Issue[]; total: number }>(`/issues?${params}`),
+      fetchApi<{ data: Issue[]; pagination: { total: number } }>(`/issues?${params}`).then(
+        (r) => ({ issues: r.data, total: r.pagination.total })
+      ),
   });
 }
 
@@ -125,7 +127,7 @@ export function useIssue(issueId: string) {
   return useQuery({
     queryKey: ['issues', issueId],
     queryFn: () =>
-      fetchApi<{ issue: Issue }>(`/issues/${issueId}`).then((r) => r.issue),
+      fetchApi<{ data: Issue }>(`/issues/${issueId}`).then((r) => r.data),
     enabled: !!issueId,
   });
 }
@@ -134,8 +136,8 @@ export function useIssueEvents(issueId: string) {
   return useQuery({
     queryKey: ['issues', issueId, 'events'],
     queryFn: () =>
-      fetchApi<{ events: Event[] }>(`/issues/${issueId}/events`).then(
-        (r) => r.events
+      fetchApi<{ data: Event[] }>(`/issues/${issueId}/events`).then(
+        (r) => r.data
       ),
     enabled: !!issueId,
   });

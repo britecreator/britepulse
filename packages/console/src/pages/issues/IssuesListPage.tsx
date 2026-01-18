@@ -50,8 +50,11 @@ export default function IssuesListPage() {
     setFilters((f) => ({ ...f, page: Math.max(1, f.page - 1) }));
   }
 
-  const totalPages = data ? Math.ceil(data.total / filters.page_size) : 0;
+  const total = data?.total ?? 0;
+  const totalPages = total > 0 ? Math.ceil(total / filters.page_size) : 1;
   const currentPage = filters.page;
+  const startItem = total > 0 ? (filters.page - 1) * filters.page_size + 1 : 0;
+  const endItem = Math.min(filters.page * filters.page_size, total);
 
   return (
     <div className="space-y-6">
@@ -251,11 +254,9 @@ export default function IssuesListPage() {
                 <div>
                   <p className="text-sm text-gray-700">
                     Showing{' '}
-                    <span className="font-medium">{(filters.page - 1) * filters.page_size + 1}</span> to{' '}
-                    <span className="font-medium">
-                      {Math.min(filters.page * filters.page_size, data?.total ?? 0)}
-                    </span>{' '}
-                    of <span className="font-medium">{data?.total ?? 0}</span> results
+                    <span className="font-medium">{startItem}</span> to{' '}
+                    <span className="font-medium">{endItem}</span>{' '}
+                    of <span className="font-medium">{total}</span> results
                   </p>
                 </div>
                 <div>
