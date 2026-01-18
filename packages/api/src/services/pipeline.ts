@@ -76,11 +76,15 @@ export async function processEvent(
   }
 
   // Step 3: Create event with redacted data
-  const event = await firestoreService.createEvent({
+  const eventToCreate: Omit<Event, 'event_id'> = {
     ...eventData,
     payload: redactedPayload as unknown as Event['payload'],
-    fingerprint: fingerprint || undefined,
-  });
+  };
+  // Only include fingerprint if it exists (Firestore doesn't allow undefined)
+  if (fingerprint) {
+    eventToCreate.fingerprint = fingerprint;
+  }
+  const event = await firestoreService.createEvent(eventToCreate);
 
   // Step 4: Find or create issue
   let issue: Issue;
