@@ -64,7 +64,7 @@ export function createApiClient(config: BritePulseConfig) {
       event_type: 'feedback',
       session_id: context.sessionId,
       trace_id: context.traceId,
-      route_or_url: context.route,
+      route_or_url: context.route || '/',
       version: context.version,
       user: context.user
         ? { user_id: context.user.id, role: context.user.role, email: context.user.email }
@@ -86,7 +86,7 @@ export function createApiClient(config: BritePulseConfig) {
       event_type: 'frontend_error',
       session_id: context.sessionId,
       trace_id: context.traceId,
-      route_or_url: context.route,
+      route_or_url: context.route || '/',
       version: context.version,
       user: context.user
         ? { user_id: context.user.id, role: context.user.role, email: context.user.email }
