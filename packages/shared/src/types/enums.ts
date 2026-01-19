@@ -13,7 +13,8 @@ export type IssueStatus =
   | 'in_progress'
   | 'blocked'
   | 'snoozed'
-  | 'resolved';
+  | 'resolved'
+  | 'wont_fix';
 
 // Event types captured by the system
 export type EventType = 'feedback' | 'frontend_error' | 'backend_error';
@@ -42,13 +43,15 @@ export type AuditTargetType = 'app' | 'issue' | 'event' | 'attachment' | 'user';
 export type Environment = 'prod' | 'stage' | 'dev' | string;
 
 // Allowed issue status transitions (Section 6)
+// Updated to allow more flexible workflows for console users
 export const ALLOWED_STATUS_TRANSITIONS: Record<IssueStatus, IssueStatus[]> = {
-  new: ['triaged', 'in_progress'],
-  triaged: ['in_progress', 'blocked', 'snoozed'],
-  in_progress: ['blocked', 'resolved'],
-  blocked: ['in_progress'],
-  snoozed: ['triaged', 'resolved'],
-  resolved: ['triaged'], // reopen only with new evidence
+  new: ['triaged', 'in_progress', 'resolved', 'wont_fix'],
+  triaged: ['in_progress', 'blocked', 'snoozed', 'resolved', 'wont_fix'],
+  in_progress: ['blocked', 'snoozed', 'resolved', 'wont_fix'],
+  blocked: ['in_progress', 'resolved', 'wont_fix'],
+  snoozed: ['triaged', 'in_progress', 'resolved', 'wont_fix'],
+  resolved: ['triaged', 'in_progress'], // reopen
+  wont_fix: ['triaged', 'in_progress'], // reopen
 };
 
 // Severity weights for priority scoring (Section 8.1)

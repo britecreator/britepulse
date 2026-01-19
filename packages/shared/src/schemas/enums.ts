@@ -13,6 +13,7 @@ export const IssueStatusSchema = z.enum([
   'blocked',
   'snoozed',
   'resolved',
+  'wont_fix',
 ]);
 
 export const EventTypeSchema = z.enum(['feedback', 'frontend_error', 'backend_error']);
