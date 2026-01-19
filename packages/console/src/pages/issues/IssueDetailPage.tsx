@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   useIssue,
   useIssueEvents,
-  useUpdateIssue,
+  useUpdateIssueStatus,
+  useUpdateIssueSeverity,
   useTriageIssue,
 } from '../../hooks/useApi';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,7 +19,8 @@ export default function IssueDetailPage() {
   const { hasRole } = useAuth();
   const { data: issue, isLoading, error } = useIssue(issueId!);
   const { data: events, isLoading: eventsLoading } = useIssueEvents(issueId!);
-  const updateIssue = useUpdateIssue(issueId!);
+  const updateStatus = useUpdateIssueStatus(issueId!);
+  const updateSeverity = useUpdateIssueSeverity(issueId!);
   const triageIssue = useTriageIssue(issueId!);
 
   const [activeTab, setActiveTab] = useState<'timeline' | 'ai' | 'events'>('timeline');
@@ -45,11 +47,11 @@ export default function IssueDetailPage() {
   }
 
   async function handleStatusChange(status: IssueStatus) {
-    await updateIssue.mutateAsync({ status });
+    await updateStatus.mutateAsync({ status });
   }
 
   async function handleSeverityChange(severity: Severity) {
-    await updateIssue.mutateAsync({ severity });
+    await updateSeverity.mutateAsync({ severity });
   }
 
   async function handleTriage() {
@@ -60,8 +62,9 @@ export default function IssueDetailPage() {
     await triageIssue.mutateAsync(true);
   }
 
-  const canEdit = hasRole('Engineer');
-  const canTriage = hasRole('PO');
+  // Admin, PO, and Engineer can edit issues
+  const canEdit = hasRole('Admin') || hasRole('PO') || hasRole('Engineer');
+  const canTriage = hasRole('Admin') || hasRole('PO');
 
   return (
     <div className="space-y-6">
@@ -87,7 +90,7 @@ export default function IssueDetailPage() {
               </span>
               <h1 className="text-2xl font-bold text-gray-900">{issue.title}</h1>
             </div>
-            <p className="mt-2 text-gray-600">{issue.description}</p>
+            <p className="mt-2 text-gray-600 whitespace-pre-wrap">{issue.description}</p>
             <div className="mt-2 text-sm text-gray-500">
               {issue.app_id} / {issue.environment} | First seen:{' '}
               {new Date(issue.timestamps.first_seen).toLocaleString()}
@@ -147,7 +150,7 @@ export default function IssueDetailPage() {
                 className="input mt-1"
                 value={issue.status}
                 onChange={(e) => handleStatusChange(e.target.value as IssueStatus)}
-                disabled={updateIssue.isPending}
+                disabled={updateStatus.isPending}
               >
                 {STATUSES.map((status) => (
                   <option key={status} value={status}>
@@ -162,7 +165,7 @@ export default function IssueDetailPage() {
                 className="input mt-1"
                 value={issue.severity}
                 onChange={(e) => handleSeverityChange(e.target.value as Severity)}
-                disabled={updateIssue.isPending}
+                disabled={updateSeverity.isPending}
               >
                 {SEVERITIES.map((severity) => (
                   <option key={severity} value={severity}>

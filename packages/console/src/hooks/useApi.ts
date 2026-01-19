@@ -143,19 +143,39 @@ export function useIssueEvents(issueId: string) {
   });
 }
 
-export function useUpdateIssue(issueId: string) {
+export function useUpdateIssueStatus(issueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { status?: IssueStatus; severity?: Severity; assigned_to?: string }) =>
-      fetchApi<{ issue: Issue }>(`/issues/${issueId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
+    mutationFn: (data: { status: IssueStatus; reason?: string }) =>
+      fetchApi<{ data: Issue }>(`/issues/${issueId}/actions/set-status`, {
+        method: 'POST',
+        body: JSON.stringify({ status: data.status, reason: data.reason || 'Status updated via console' }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
       queryClient.invalidateQueries({ queryKey: ['issues', issueId] });
     },
   });
+}
+
+export function useUpdateIssueSeverity(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { severity: Severity; reason?: string }) =>
+      fetchApi<{ data: Issue }>(`/issues/${issueId}/actions/set-severity`, {
+        method: 'POST',
+        body: JSON.stringify({ severity: data.severity, reason: data.reason || 'Severity updated via console' }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      queryClient.invalidateQueries({ queryKey: ['issues', issueId] });
+    },
+  });
+}
+
+// Keep backwards compatibility alias
+export function useUpdateIssue(issueId: string) {
+  return useUpdateIssueStatus(issueId);
 }
 
 export function useTriageIssue(issueId: string) {

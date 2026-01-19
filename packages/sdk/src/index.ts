@@ -12,6 +12,7 @@ import {
   getSessionId,
   generateTraceId,
   setTraceId,
+  setUser as setContextUser,
 } from './context.js';
 import { setupErrorCapture, teardownErrorCapture, captureError, captureComponentError } from './capture.js';
 import { mountWidget, destroyWidget } from './widget/index.js';
@@ -32,6 +33,8 @@ export interface BritePulse {
   generateTraceId: () => string;
   /** Set the current trace ID */
   setTraceId: (traceId: string) => void;
+  /** Set the current user context */
+  setUser: (user: { id?: string; role?: string; email?: string } | undefined) => void;
   /** Destroy the SDK (cleanup) */
   destroy: () => void;
 }
@@ -104,6 +107,12 @@ export function init(config: BritePulseConfig): BritePulse {
     getSessionId,
     generateTraceId,
     setTraceId,
+    setUser: (user) => {
+      setContextUser(user);
+      if (fullConfig.debug) {
+        console.log('[BritePulse] User set:', user);
+      }
+    },
     destroy: () => {
       teardownErrorCapture();
       destroyWidget();

@@ -60,7 +60,7 @@ export default function App() {
     if (isAuthenticated && user) {
       const instance = window.BritePulse?.getInstance();
       instance?.setUser?.({
-        userId: user.user_id,
+        id: user.user_id,
         email: user.email,
       });
     }

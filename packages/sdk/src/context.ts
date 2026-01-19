@@ -8,6 +8,23 @@ import type { ContextData, BritePulseConfig } from './types.js';
 const SESSION_KEY = 'britepulse_session_id';
 const TRACE_HEADER = 'x-trace-id';
 
+// Stored user context that can be updated after init
+let currentUser: { id?: string; role?: string; email?: string } | undefined;
+
+/**
+ * Set/update the current user context
+ */
+export function setUser(user: { id?: string; role?: string; email?: string } | undefined): void {
+  currentUser = user;
+}
+
+/**
+ * Get the current user context
+ */
+export function getUser(): { id?: string; role?: string; email?: string } | undefined {
+  return currentUser;
+}
+
 /**
  * Generate a unique ID (UUID v4 format)
  */
@@ -73,16 +90,18 @@ export function getCurrentRoute(): string {
  * Collect all context data
  */
 export function collectContext(config: BritePulseConfig): ContextData {
+  // Use currentUser (set via setUser) if available, otherwise fall back to config.user
+  const user = currentUser || config.user;
   return {
     sessionId: getSessionId(),
     traceId: getTraceId(),
     route: getCurrentRoute(),
     version: config.version || 'unknown',
-    user: config.user
+    user: user
       ? {
-          id: config.user.id,
-          role: config.user.role,
-          email: config.user.email,
+          id: user.id,
+          role: user.role,
+          email: user.email,
         }
       : undefined,
   };
