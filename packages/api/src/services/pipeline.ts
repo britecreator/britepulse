@@ -134,10 +134,13 @@ async function createIssueFromEvent(
   event: Event,
   fingerprint: string | null
 ): Promise<Issue> {
-  // Extract reporter from event user
+  // Extract reporter from event user (only include email if it exists - Firestore rejects undefined)
   const reportedBy =
     event.user?.user_id && event.user.user_id !== 'unknown'
-      ? { user_id: event.user.user_id, email: event.user.email }
+      ? {
+          user_id: event.user.user_id,
+          ...(event.user.email && { email: event.user.email }),
+        }
       : null;
 
   const issueInput: IssueInput = {
