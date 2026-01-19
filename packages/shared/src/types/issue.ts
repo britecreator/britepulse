@@ -32,6 +32,14 @@ export interface IssueRouting {
 }
 
 /**
+ * User who reported the issue (from first event)
+ */
+export interface IssueReporter {
+  user_id: string;
+  email?: string;
+}
+
+/**
  * Issue entity (Section 4.8)
  * A deduped, grouped, triaged unit representing a bug or request
  */
@@ -52,6 +60,7 @@ export interface Issue {
 
   // Optional fields
   routing?: IssueRouting;
+  reported_by?: IssueReporter | null; // user who reported (from first event)
   ai_analysis?: AIAnalysis;
   tags?: string[];
   related_issue_ids?: string[];
@@ -72,6 +81,7 @@ export interface IssueInput {
   severity?: Severity; // default: P2
   primary_fingerprint?: string;
   initial_event_id: string;
+  reported_by?: IssueReporter | null;
   tags?: string[];
 }
 

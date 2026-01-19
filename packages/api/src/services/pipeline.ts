@@ -134,6 +134,12 @@ async function createIssueFromEvent(
   event: Event,
   fingerprint: string | null
 ): Promise<Issue> {
+  // Extract reporter from event user
+  const reportedBy =
+    event.user?.user_id && event.user.user_id !== 'unknown'
+      ? { user_id: event.user.user_id, email: event.user.email }
+      : null;
+
   const issueInput: IssueInput = {
     app_id: event.app_id,
     environment: event.environment,
@@ -143,6 +149,7 @@ async function createIssueFromEvent(
     severity: inferSeverity(event),
     primary_fingerprint: fingerprint || undefined,
     initial_event_id: event.event_id,
+    reported_by: reportedBy,
   };
 
   return firestoreService.createIssue(issueInput);

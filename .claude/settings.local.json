@@ -73,7 +73,15 @@
       "Bash(npx tsc:*)",
       "Bash(echo:*)",
       "Bash(ls:*)",
-      "Bash(openssl rand:*)"
+      "Bash(openssl rand:*)",
+      "Bash(gcloud builds list:*)",
+      "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds list --limit=3 --project=briteco-gcp)",
+      "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" config get-value project)",
+      "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds list --limit=3 --project=britecreations)",
+      "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds list --ongoing --project=britecreations)",
+      "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds list --limit=5 --project=britecreations --filter=\"createTime>''-PT5M''\")",
+      "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds triggers list --project=britecreations)",
+      "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds triggers list --project=britecreations --format=\"table\\(name,github.name,github.push.branch\\)\")"
     ]
   }
 }

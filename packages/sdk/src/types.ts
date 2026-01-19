@@ -13,6 +13,7 @@ export interface BritePulseConfig {
   user?: {
     id?: string;
     role?: string;
+    email?: string;
   };
   /** Enable/disable error capture */
   captureErrors?: boolean;
@@ -57,6 +58,7 @@ export interface EventPayload {
   user?: {
     user_id?: string;
     role?: string;
+    email?: string;
   };
   payload: Record<string, unknown>;
 }
@@ -69,5 +71,6 @@ export interface ContextData {
   user?: {
     id?: string;
     role?: string;
+    email?: string;
   };
 }

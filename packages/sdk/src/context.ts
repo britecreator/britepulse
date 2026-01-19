@@ -82,6 +82,7 @@ export function collectContext(config: BritePulseConfig): ContextData {
       ? {
           id: config.user.id,
           role: config.user.role,
+          email: config.user.email,
         }
       : undefined,
   };

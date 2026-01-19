@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useIssues, useApps } from '../../hooks/useApi';
-import type { IssueStatus, Severity, Environment } from '../../types';
+import type { IssueStatus, Severity, Environment, Issue } from '../../types';
 
 const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'wont_fix'];
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3'];
@@ -21,6 +21,19 @@ export default function IssuesListPage() {
 
   const { data, isLoading, error } = useIssues(filters);
   const { data: apps } = useApps();
+
+  // Create a map of app_id to app name for display
+  const appNameMap = useMemo(() => {
+    return Object.fromEntries(apps?.map((app) => [app.app_id, app.name]) ?? []);
+  }, [apps]);
+
+  // Helper to determine if issue is from user feedback or auto error
+  const getIssueSource = (issue: Issue) => {
+    if (issue.issue_type === 'feedback' || issue.issue_type === 'feature') {
+      return { label: 'User Feedback', className: 'bg-blue-100 text-blue-800' };
+    }
+    return { label: 'Auto Error', className: 'bg-red-100 text-red-800' };
+  };
 
   function toggleStatus(status: IssueStatus) {
     setFilters((f) => ({
@@ -170,13 +183,13 @@ export default function IssuesListPage() {
                     App / Env
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Source
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Reported By
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Events (24h)
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Users (24h)
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Priority
@@ -210,19 +223,29 @@ export default function IssuesListPage() {
                       </Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div>{issue.app_id}</div>
+                      <div className="font-medium text-gray-900">
+                        {appNameMap[issue.app_id] || issue.app_id}
+                      </div>
                       <div className="text-xs">{issue.environment}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          getIssueSource(issue).className
+                        }`}
+                      >
+                        {getIssueSource(issue).label}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {issue.reported_by?.email ||
+                        issue.reported_by?.user_id ||
+                        'Anonymous'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`badge-${issue.status}`}>
                         {issue.status.replace('_', ' ')}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {issue.counts.occurrences_24h}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {issue.counts.unique_users_24h_est}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {issue.priority_score?.toFixed(0) ?? '-'}

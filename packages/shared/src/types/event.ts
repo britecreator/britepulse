@@ -11,6 +11,7 @@ import type { Environment, EventType } from './enums.js';
 export interface EventUser {
   user_id: string; // or 'unknown'
   role: string; // or 'unknown'
+  email?: string; // captured when user is logged in
 }
 
 /**

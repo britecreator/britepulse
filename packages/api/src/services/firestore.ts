@@ -281,6 +281,7 @@ export async function createIssue(input: IssueInput): Promise<Issue> {
       created_at: now,
       last_seen_at: now,
     },
+    reported_by: input.reported_by || null,
     tags: input.tags || [],
   };
 

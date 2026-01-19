@@ -114,6 +114,13 @@ export interface AIAnalysis {
   additional_info_needed?: string[];
 }
 
+export type IssueType = 'bug' | 'feature' | 'feedback' | 'question';
+
+export interface IssueReporter {
+  user_id: string;
+  email?: string;
+}
+
 export interface Issue {
   issue_id: string;
   app_id: string;
@@ -123,10 +130,12 @@ export interface Issue {
   severity: Severity;
   title: string;
   description: string;
+  issue_type: IssueType;
   counts: IssueCounts;
   timestamps: IssueTimestamps;
   priority_score?: number;
   assigned_to?: string;
+  reported_by?: IssueReporter | null;
   ai_analysis?: AIAnalysis;
 }
 
