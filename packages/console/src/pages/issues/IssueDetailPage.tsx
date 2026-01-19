@@ -13,6 +13,14 @@ import type { IssueStatus, Severity, FixOption } from '../../types';
 const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'wont_fix'];
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3'];
 
+// Safe date formatting helper
+function formatDate(dateString: string | undefined | null): string {
+  if (!dateString) return 'Unknown date';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Invalid date';
+  return date.toLocaleString();
+}
+
 export default function IssueDetailPage() {
   const { issueId } = useParams<{ issueId: string }>();
   const navigate = useNavigate();
@@ -93,7 +101,7 @@ export default function IssueDetailPage() {
             <p className="mt-2 text-gray-600 whitespace-pre-wrap">{issue.description}</p>
             <div className="mt-2 text-sm text-gray-500">
               {issue.app_id} / {issue.environment} | First seen:{' '}
-              {new Date(issue.timestamps.first_seen).toLocaleString()}
+              {formatDate(issue.timestamps.created_at)}
             </div>
           </div>
           {canTriage && (
@@ -225,6 +233,7 @@ export default function IssueDetailPage() {
             <div className="space-y-4">
               <div className="flow-root">
                 <ul className="-mb-8">
+                  {/* Issue created */}
                   <li className="relative pb-8">
                     <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" />
                     <div className="relative flex space-x-3">
@@ -237,21 +246,27 @@ export default function IssueDetailPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm font-medium text-gray-900">
                             Issue created
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {issue.issue_type === 'bug' ? 'Auto-captured error' : 'User-submitted feedback'}
                           </p>
                         </div>
                         <div className="mt-1 text-sm text-gray-500">
-                          {new Date(issue.timestamps.first_seen).toLocaleString()}
+                          {formatDate(issue.timestamps.created_at)}
                         </div>
                       </div>
                     </div>
                   </li>
+
+                  {/* AI Analysis completed */}
                   {issue.ai_analysis && (
                     <li className="relative pb-8">
+                      <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" />
                       <div className="relative flex space-x-3">
                         <div>
-                          <span className="h-8 w-8 rounded-full bg-bright-teal flex items-center justify-center ring-8 ring-white">
+                          <span className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center ring-8 ring-white">
                             <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                             </svg>
@@ -259,12 +274,69 @@ export default function IssueDetailPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm font-medium text-gray-900">
                               AI Analysis completed
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {(issue.ai_analysis.confidence * 100).toFixed(0)}% confidence
                             </p>
                           </div>
                           <div className="mt-1 text-sm text-gray-500">
-                            {new Date(issue.ai_analysis.generated_at).toLocaleString()}
+                            {formatDate(issue.ai_analysis.generated_at)}
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  )}
+
+                  {/* Last activity */}
+                  {issue.timestamps.last_seen_at && issue.timestamps.last_seen_at !== issue.timestamps.created_at && (
+                    <li className="relative pb-8">
+                      <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" />
+                      <div className="relative flex space-x-3">
+                        <div>
+                          <span className="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center ring-8 ring-white">
+                            <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              Last occurrence
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {issue.counts.occurrences_total} total occurrences
+                            </p>
+                          </div>
+                          <div className="mt-1 text-sm text-gray-500">
+                            {formatDate(issue.timestamps.last_seen_at)}
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  )}
+
+                  {/* Resolved */}
+                  {issue.timestamps.resolved_at && (
+                    <li className="relative pb-8">
+                      <div className="relative flex space-x-3">
+                        <div>
+                          <span className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center ring-8 ring-white">
+                            <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              Issue resolved
+                            </p>
+                          </div>
+                          <div className="mt-1 text-sm text-gray-500">
+                            {formatDate(issue.timestamps.resolved_at)}
                           </div>
                         </div>
                       </div>
@@ -282,7 +354,7 @@ export default function IssueDetailPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-gray-500">
-                        Analyzed {new Date(issue.ai_analysis.generated_at).toLocaleString()}
+                        Analyzed {formatDate(issue.ai_analysis.generated_at)}
                       </span>
                       <span className="text-sm text-gray-500">|</span>
                       <span className="text-sm text-gray-500">
@@ -411,7 +483,7 @@ export default function IssueDetailPage() {
                             {event.event_type}
                           </span>
                           <span className="text-sm text-gray-500">
-                            {new Date(event.timestamp).toLocaleString()}
+                            {formatDate(event.timestamp)}
                           </span>
                         </div>
                         <span className="text-xs text-gray-400">{event.event_id}</span>
