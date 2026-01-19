@@ -75,7 +75,7 @@ router.post(
           user: {
             user_id: eventInput.user?.user_id || 'anonymous',
             role: eventInput.user?.role || 'user',
-            email: eventInput.user?.email,
+            ...(eventInput.user?.email && { email: eventInput.user.email }),
           },
           payload: eventInput.payload as unknown as Event['payload'],
         };
