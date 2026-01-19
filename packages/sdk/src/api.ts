@@ -60,15 +60,24 @@ export function createApiClient(config: BritePulseConfig) {
    * Create event payload from feedback data
    */
   function createFeedbackEvent(feedback: FeedbackData, context: ContextData): EventPayload {
+    // Build user object only with defined values
+    let user: EventPayload['user'] = undefined;
+    if (context.user) {
+      user = {};
+      if (context.user.id) user.user_id = context.user.id;
+      if (context.user.role) user.role = context.user.role;
+      if (context.user.email) user.email = context.user.email;
+      // If no properties were set, don't include user at all
+      if (Object.keys(user).length === 0) user = undefined;
+    }
+
     return {
       event_type: 'feedback',
       session_id: context.sessionId,
       trace_id: context.traceId,
       route_or_url: context.route || '/',
       version: context.version,
-      user: context.user
-        ? { user_id: context.user.id, role: context.user.role, email: context.user.email }
-        : undefined,
+      user,
       payload: {
         category: feedback.category,
         description: feedback.description,
@@ -82,15 +91,24 @@ export function createApiClient(config: BritePulseConfig) {
    * Create event payload from error data
    */
   function createErrorEvent(error: ErrorData, context: ContextData): EventPayload {
+    // Build user object only with defined values
+    let user: EventPayload['user'] = undefined;
+    if (context.user) {
+      user = {};
+      if (context.user.id) user.user_id = context.user.id;
+      if (context.user.role) user.role = context.user.role;
+      if (context.user.email) user.email = context.user.email;
+      // If no properties were set, don't include user at all
+      if (Object.keys(user).length === 0) user = undefined;
+    }
+
     return {
       event_type: 'frontend_error',
       session_id: context.sessionId,
       trace_id: context.traceId,
       route_or_url: context.route || '/',
       version: context.version,
-      user: context.user
-        ? { user_id: context.user.id, role: context.user.role, email: context.user.email }
-        : undefined,
+      user,
       payload: {
         error_type: error.type,
         message: error.message,
