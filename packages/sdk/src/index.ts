@@ -171,8 +171,22 @@ if (typeof document !== 'undefined') {
 
 // Expose to window for UMD builds
 if (typeof window !== 'undefined') {
-  (window as unknown as { BritePulse: { init: typeof init; getInstance: typeof getInstance } }).BritePulse = {
+  (window as unknown as {
+    BritePulse: {
+      init: typeof init;
+      getInstance: typeof getInstance;
+      captureError: (error: Error | string, metadata?: Record<string, unknown>) => void;
+      openWidget: (options?: { type?: string }) => void;
+    };
+  }).BritePulse = {
     init,
     getInstance,
+    // Convenience methods that delegate to instance
+    captureError: (error, metadata) => instance?.captureError(error, metadata),
+    openWidget: () => {
+      // Open the feedback widget if mounted
+      const trigger = document.querySelector('[data-britepulse-trigger]') as HTMLButtonElement;
+      if (trigger) trigger.click();
+    },
   };
 }

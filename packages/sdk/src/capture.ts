@@ -88,6 +88,19 @@ function handleUnhandledRejection(event: PromiseRejectionEvent): void {
 }
 
 /**
+ * Handle error events (addEventListener version)
+ */
+function handleErrorEvent(event: ErrorEvent): void {
+  if (!errorHandler) return;
+
+  const errorData = event.error
+    ? normalizeError(event.error, event.filename, event.lineno, event.colno)
+    : normalizeError(event.message, event.filename, event.lineno, event.colno);
+
+  errorHandler(errorData);
+}
+
+/**
  * Setup error capture listeners
  */
 export function setupErrorCapture(config: BritePulseConfig, handler: ErrorHandler): void {
@@ -98,8 +111,8 @@ export function setupErrorCapture(config: BritePulseConfig, handler: ErrorHandle
 
   errorHandler = handler;
 
-  // Capture window errors
-  window.onerror = handleWindowError;
+  // Capture window errors using addEventListener (more robust than window.onerror)
+  window.addEventListener('error', handleErrorEvent);
 
   // Capture unhandled promise rejections
   window.addEventListener('unhandledrejection', handleUnhandledRejection);
@@ -117,7 +130,7 @@ export function setupErrorCapture(config: BritePulseConfig, handler: ErrorHandle
 export function teardownErrorCapture(): void {
   if (typeof window === 'undefined') return;
 
-  window.onerror = null;
+  window.removeEventListener('error', handleErrorEvent);
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
 
   errorHandler = null;
