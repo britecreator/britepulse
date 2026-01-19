@@ -8,6 +8,7 @@ import { EnvironmentSchema, EventTypeSchema } from './enums.js';
 export const EventUserSchema = z.object({
   user_id: z.string().default('unknown'),
   role: z.string().default('unknown'),
+  email: z.string().email().optional(),
 });
 
 export const RequestMetadataSchema = z.object({
@@ -78,6 +79,7 @@ export const EventInputSchema = z.object({
     .object({
       user_id: z.string().optional(),
       role: z.string().optional(),
+      email: z.string().email().optional(),
     })
     .optional(),
   payload: z.record(z.unknown()),
@@ -118,6 +120,7 @@ export const EventIngestionSchema = z.object({
     .object({
       user_id: z.string().optional(),
       role: z.string().optional(),
+      email: z.string().email().optional(),
     })
     .optional(),
   payload: z.record(z.unknown()),
