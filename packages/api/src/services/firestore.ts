@@ -95,6 +95,11 @@ export async function getApps(appIds?: string[]): Promise<App[]> {
   const firestore = getFirestore();
   let query = firestore.collection(COLLECTIONS.apps);
 
+  // If appIds is provided but empty, user has no access - return empty
+  if (appIds !== undefined && appIds !== null && appIds.length === 0) {
+    return [];
+  }
+
   if (appIds && appIds.length > 0) {
     // Firestore 'in' query supports max 10 items
     const chunks = [];
@@ -346,57 +351,92 @@ export async function getIssues(
 
   let query: FirebaseFirestore.Query = firestore.collection(COLLECTIONS.issues);
 
-  // Apply app access filter (chunked for >10 apps)
-  if (accessibleAppIds && accessibleAppIds.length > 0) {
-    if (accessibleAppIds.length <= 10) {
-      query = query.where('app_id', 'in', accessibleAppIds);
-    } else {
-      // For >10 apps, we need to do multiple queries and merge
-      // For now, use first 10 - TODO: implement chunked queries for issues
-      query = query.where('app_id', 'in', accessibleAppIds.slice(0, 10));
-    }
-  }
+  // Track if we've used an 'in' clause (Firestore only allows one per query)
+  let usedInClause = false;
 
-  // Apply filters
-  if (filters.app_id) {
+  // Filters that need to be applied in-memory due to Firestore 'in' clause limitation
+  const memoryFilters: {
+    status?: string[];
+    severity?: string[];
+    issue_type?: string[];
+    app_ids?: string[];
+  } = {};
+
+  // Apply app access filter
+  if (accessibleAppIds && accessibleAppIds.length > 0) {
+    // If user has specific app access and also filtering by app_id, use equality
+    if (filters.app_id && accessibleAppIds.includes(filters.app_id)) {
+      query = query.where('app_id', '==', filters.app_id);
+    } else if (filters.app_id) {
+      // User is filtering by an app they don't have access to
+      return { issues: [], total: 0 };
+    } else if (accessibleAppIds.length === 1) {
+      query = query.where('app_id', '==', accessibleAppIds[0]);
+    } else if (accessibleAppIds.length <= 10) {
+      query = query.where('app_id', 'in', accessibleAppIds);
+      usedInClause = true;
+    } else {
+      // For >10 apps, filter in memory
+      memoryFilters.app_ids = accessibleAppIds;
+    }
+  } else if (filters.app_id) {
+    // Admin filtering by specific app
     query = query.where('app_id', '==', filters.app_id);
   }
+
+  // Apply environment filter (always equality, no 'in' needed)
   if (filters.environment) {
     query = query.where('environment', '==', filters.environment);
   }
+
+  // Apply status filter
   if (filters.status) {
     const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
     if (statuses.length === 1) {
       query = query.where('status', '==', statuses[0]);
-    } else {
+    } else if (!usedInClause) {
       query = query.where('status', 'in', statuses);
+      usedInClause = true;
+    } else {
+      // Need to filter in memory
+      memoryFilters.status = statuses;
     }
   }
+
+  // Apply severity filter
   if (filters.severity) {
     const severities = Array.isArray(filters.severity) ? filters.severity : [filters.severity];
     if (severities.length === 1) {
       query = query.where('severity', '==', severities[0]);
-    } else {
+    } else if (!usedInClause) {
       query = query.where('severity', 'in', severities);
+      usedInClause = true;
+    } else {
+      // Need to filter in memory
+      memoryFilters.severity = severities;
     }
   }
+
+  // Apply issue_type filter
   if (filters.issue_type) {
     const types = Array.isArray(filters.issue_type) ? filters.issue_type : [filters.issue_type];
     if (types.length === 1) {
       query = query.where('issue_type', '==', types[0]);
-    } else {
+    } else if (!usedInClause) {
       query = query.where('issue_type', 'in', types);
+      usedInClause = true;
+    } else {
+      // Need to filter in memory
+      memoryFilters.issue_type = types;
     }
   }
+
+  // Apply assigned_to filter (always equality)
   if (filters.assigned_to) {
     query = query.where('routing.assigned_to', '==', filters.assigned_to);
   }
 
-  // Get total count (simplified - in production use count aggregation)
-  const countSnapshot = await query.get();
-  const total = countSnapshot.size;
-
-  // Apply sorting
+  // Determine sort field
   const sortField =
     sort.field === 'priority_score'
       ? 'severity' // Use severity as proxy for priority
@@ -410,9 +450,43 @@ export async function getIssues(
               ? 'timestamps.created_at'
               : sort.field;
 
-  query = query.orderBy(sortField, sort.direction);
+  // Check if we need memory filtering
+  const needsMemoryFilter = Object.keys(memoryFilters).length > 0;
 
-  // Apply pagination
+  if (needsMemoryFilter) {
+    // Fetch all matching docs and filter in memory
+    query = query.orderBy(sortField, sort.direction);
+    const snapshot = await query.get();
+    let allIssues = snapshot.docs.map((doc) => doc.data() as Issue);
+
+    // Apply memory filters
+    if (memoryFilters.app_ids) {
+      allIssues = allIssues.filter((i) => memoryFilters.app_ids!.includes(i.app_id));
+    }
+    if (memoryFilters.status) {
+      allIssues = allIssues.filter((i) => memoryFilters.status!.includes(i.status));
+    }
+    if (memoryFilters.severity) {
+      allIssues = allIssues.filter((i) => memoryFilters.severity!.includes(i.severity));
+    }
+    if (memoryFilters.issue_type) {
+      allIssues = allIssues.filter((i) => memoryFilters.issue_type!.includes(i.issue_type));
+    }
+
+    const total = allIssues.length;
+    const start = (page - 1) * pageSize;
+    const issues = allIssues.slice(start, start + pageSize);
+
+    return { issues, total };
+  }
+
+  // No memory filtering needed - use Firestore pagination
+  // Get total count
+  const countSnapshot = await query.get();
+  const total = countSnapshot.size;
+
+  // Apply sorting and pagination
+  query = query.orderBy(sortField, sort.direction);
   query = query.offset((page - 1) * pageSize).limit(pageSize);
 
   const snapshot = await query.get();
@@ -438,6 +512,78 @@ export async function findIssueByFingerprint(
 
   if (snapshot.empty) return null;
   return snapshot.docs[0].data() as Issue;
+}
+
+/**
+ * Merge source issues into a target issue
+ * - Combines event_refs from all source issues into target
+ * - Aggregates counts
+ * - Marks source issues as resolved with merge reason
+ * - Returns updated target issue
+ */
+export async function mergeIssues(
+  targetIssueId: string,
+  sourceIssueIds: string[]
+): Promise<Issue | null> {
+  const firestore = getFirestore();
+  const batch = firestore.batch();
+
+  // Get target issue
+  const targetDoc = await firestore.collection(COLLECTIONS.issues).doc(targetIssueId).get();
+  if (!targetDoc.exists) return null;
+  const targetIssue = targetDoc.data() as Issue;
+
+  // Get source issues
+  const sourceIssues: Issue[] = [];
+  for (const sourceId of sourceIssueIds) {
+    const sourceDoc = await firestore.collection(COLLECTIONS.issues).doc(sourceId).get();
+    if (sourceDoc.exists) {
+      sourceIssues.push(sourceDoc.data() as Issue);
+    }
+  }
+
+  if (sourceIssues.length === 0) {
+    return targetIssue;
+  }
+
+  // Aggregate event_refs and counts from source issues
+  const allEventRefs = new Set(targetIssue.event_refs);
+  let additionalOccurrences = 0;
+  let additionalUsers = 0;
+
+  for (const source of sourceIssues) {
+    source.event_refs.forEach((ref) => allEventRefs.add(ref));
+    additionalOccurrences += source.counts.occurrences_total;
+    additionalUsers += source.counts.unique_users_24h_est;
+  }
+
+  // Update target issue with merged data
+  const targetRef = firestore.collection(COLLECTIONS.issues).doc(targetIssueId);
+  batch.update(targetRef, {
+    event_refs: Array.from(allEventRefs),
+    'counts.occurrences_total': FieldValue.increment(additionalOccurrences),
+    'counts.occurrences_24h': FieldValue.increment(
+      sourceIssues.reduce((sum, s) => sum + s.counts.occurrences_24h, 0)
+    ),
+    'timestamps.last_seen_at': new Date().toISOString(),
+  });
+
+  // Mark source issues as resolved (merged)
+  const now = new Date().toISOString();
+  for (const source of sourceIssues) {
+    const sourceRef = firestore.collection(COLLECTIONS.issues).doc(source.issue_id);
+    batch.update(sourceRef, {
+      status: 'resolved',
+      'timestamps.resolved_at': now,
+      merged_into: targetIssueId,
+    });
+  }
+
+  await batch.commit();
+
+  // Return updated target issue
+  const updatedDoc = await targetRef.get();
+  return updatedDoc.data() as Issue;
 }
 
 // ============ Audit Log Operations ============

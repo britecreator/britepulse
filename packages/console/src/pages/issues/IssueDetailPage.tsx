@@ -5,10 +5,9 @@ import {
   useIssueEvents,
   useUpdateIssueStatus,
   useUpdateIssueSeverity,
-  useTriageIssue,
 } from '../../hooks/useApi';
 import { useAuth } from '../../contexts/AuthContext';
-import type { IssueStatus, IssueType, Severity, FixOption } from '../../types';
+import type { IssueStatus, IssueType, Severity } from '../../types';
 
 const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'wont_fix'];
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3'];
@@ -30,9 +29,8 @@ export default function IssueDetailPage() {
   const { data: events, isLoading: eventsLoading } = useIssueEvents(issueId!);
   const updateStatus = useUpdateIssueStatus(issueId!);
   const updateSeverity = useUpdateIssueSeverity(issueId!);
-  const triageIssue = useTriageIssue(issueId!);
 
-  const [activeTab, setActiveTab] = useState<'timeline' | 'ai' | 'events'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'events'>('timeline');
 
   if (isLoading) {
     return (
@@ -63,17 +61,34 @@ export default function IssueDetailPage() {
     await updateSeverity.mutateAsync({ severity });
   }
 
-  async function handleTriage() {
-    await triageIssue.mutateAsync(false);
-  }
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
-  async function handleForceTriage() {
-    await triageIssue.mutateAsync(true);
+  async function handleDownloadContext() {
+    const token = localStorage.getItem('britepulse_token');
+    const response = await fetch(`${API_BASE}/issues/${issueId}/context?format=markdown`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      alert('Failed to download context file');
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `issue-${issueId}-context.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   // Admin, PO, and Engineer can edit issues
   const canEdit = hasRole('Admin') || hasRole('PO') || hasRole('Engineer');
-  const canTriage = hasRole('Admin') || hasRole('PO');
 
   return (
     <div className="space-y-6">
@@ -105,19 +120,16 @@ export default function IssueDetailPage() {
               {formatDate(issue.timestamps.created_at)}
             </div>
           </div>
-          {canTriage && (
-            <button
-              onClick={issue.ai_analysis ? handleForceTriage : handleTriage}
-              className="btn-secondary"
-              disabled={triageIssue.isPending}
-            >
-              {triageIssue.isPending
-                ? 'Analyzing...'
-                : issue.ai_analysis
-                ? 'Re-analyze with AI'
-                : 'Analyze with AI'}
-            </button>
-          )}
+          <button
+            onClick={handleDownloadContext}
+            className="btn-primary flex items-center gap-2"
+            title="Download a context file to give to your AI coding agent"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download for AI Agent
+          </button>
         </div>
       </div>
 
@@ -202,21 +214,6 @@ export default function IssueDetailPage() {
               Timeline
             </button>
             <button
-              onClick={() => setActiveTab('ai')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'ai'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              AI Analysis
-              {issue.ai_analysis && (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
-                  Available
-                </span>
-              )}
-            </button>
-            <button
               onClick={() => setActiveTab('events')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'events'
@@ -260,35 +257,6 @@ export default function IssueDetailPage() {
                       </div>
                     </div>
                   </li>
-
-                  {/* AI Analysis completed */}
-                  {issue.ai_analysis && (
-                    <li className="relative pb-8">
-                      <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" />
-                      <div className="relative flex space-x-3">
-                        <div>
-                          <span className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center ring-8 ring-white">
-                            <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                            </svg>
-                          </span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              AI Analysis completed
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {(issue.ai_analysis.confidence * 100).toFixed(0)}% confidence
-                            </p>
-                          </div>
-                          <div className="mt-1 text-sm text-gray-500">
-                            {formatDate(issue.ai_analysis.generated_at)}
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  )}
 
                   {/* Last activity */}
                   {issue.timestamps.last_seen_at && issue.timestamps.last_seen_at !== issue.timestamps.created_at && (
@@ -345,118 +313,6 @@ export default function IssueDetailPage() {
                   )}
                 </ul>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'ai' && (
-            <div>
-              {issue.ai_analysis ? (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500">
-                        Analyzed {formatDate(issue.ai_analysis.generated_at)}
-                      </span>
-                      <span className="text-sm text-gray-500">|</span>
-                      <span className="text-sm text-gray-500">
-                        {(issue.ai_analysis.confidence * 100).toFixed(0)}% confidence
-                      </span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Classification</h3>
-                    <p className="mt-1 text-sm text-gray-600">
-                      <span className={`badge-${issue.ai_analysis.severity.toLowerCase()}`}>
-                        {issue.ai_analysis.severity}
-                      </span>
-                      <span className="ml-2">{issue.ai_analysis.classification}</span>
-                    </p>
-                    <p className="mt-1 text-sm text-gray-500">{issue.ai_analysis.severity_rationale}</p>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Impact Summary</h3>
-                    <p className="mt-1 text-sm text-gray-600">{issue.ai_analysis.impact_summary}</p>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Root Cause Hypothesis</h3>
-                    <p className="mt-1 text-sm text-gray-600">{issue.ai_analysis.root_cause_hypothesis}</p>
-                  </div>
-
-                  {issue.ai_analysis.fix_plan.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Fix Options</h3>
-                      <ul className="mt-2 space-y-2">
-                        {issue.ai_analysis.fix_plan.map((fix: FixOption) => (
-                          <li key={fix.option_number} className="text-sm text-gray-600 border-l-2 border-gray-200 pl-3">
-                            <div className="font-medium">
-                              Option {fix.option_number}: {fix.description}
-                            </div>
-                            <div className="text-gray-500">
-                              Complexity: {fix.complexity} | Risk: {fix.risk_level}
-                            </div>
-                            <ul className="mt-1 list-disc list-inside text-gray-500">
-                              {fix.steps.map((step: string, i: number) => (
-                                <li key={i}>{step}</li>
-                              ))}
-                            </ul>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Recommended Next Action</h3>
-                    <p className="mt-1 text-sm">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                        {issue.ai_analysis.next_action}
-                      </span>
-                    </p>
-                    <p className="mt-1 text-sm text-gray-500">{issue.ai_analysis.next_action_rationale}</p>
-                  </div>
-
-                  {issue.ai_analysis.assumptions.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Assumptions</h3>
-                      <ul className="mt-1 list-disc list-inside text-sm text-gray-600">
-                        {issue.ai_analysis.assumptions.map((a: string, i: number) => (
-                          <li key={i}>{a}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {issue.ai_analysis.additional_info_needed && issue.ai_analysis.additional_info_needed.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Additional Info Needed</h3>
-                      <ul className="mt-1 list-disc list-inside text-sm text-gray-600">
-                        {issue.ai_analysis.additional_info_needed.map((info: string, i: number) => (
-                          <li key={i}>{info}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                  <p className="mt-2">No AI analysis available yet</p>
-                  {canTriage && (
-                    <button
-                      onClick={handleTriage}
-                      className="btn-primary mt-4"
-                      disabled={triageIssue.isPending}
-                    >
-                      {triageIssue.isPending ? 'Analyzing...' : 'Run AI Analysis'}
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
