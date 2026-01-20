@@ -8,10 +8,11 @@ import {
   useTriageIssue,
 } from '../../hooks/useApi';
 import { useAuth } from '../../contexts/AuthContext';
-import type { IssueStatus, Severity, FixOption } from '../../types';
+import type { IssueStatus, IssueType, Severity, FixOption } from '../../types';
 
 const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'wont_fix'];
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3'];
+const ISSUE_TYPE_BUG: IssueType = 'bug';
 
 // Safe date formatting helper
 function formatDate(dateString: string | undefined | null): string {
@@ -250,7 +251,7 @@ export default function IssueDetailPage() {
                             Issue created
                           </p>
                           <p className="text-sm text-gray-500">
-                            {issue.issue_type === 'bug' ? 'Auto-captured error' : 'User-submitted feedback'}
+                            {issue.issue_type === ISSUE_TYPE_BUG ? 'Auto-captured error' : 'User-submitted feedback'}
                           </p>
                         </div>
                         <div className="mt-1 text-sm text-gray-500">

@@ -81,7 +81,11 @@
       "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds list --ongoing --project=britecreations)",
       "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds list --limit=5 --project=britecreations --filter=\"createTime>''-PT5M''\")",
       "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds triggers list --project=britecreations)",
-      "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds triggers list --project=britecreations --format=\"table\\(name,github.name,github.push.branch\\)\")"
+      "Bash(\"C:\\\\Users\\\\DustinSitar\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" builds triggers list --project=britecreations --format=\"table\\(name,github.name,github.push.branch\\)\")",
+      "Bash(gh run view:*)",
+      "Bash(gcloud run services logs read:*)",
+      "Bash(gcloud.cmd run services logs read:*)",
+      "Bash(gh.exe run list:*)"
     ]
   }
 }

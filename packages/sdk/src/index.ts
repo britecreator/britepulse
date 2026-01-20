@@ -184,9 +184,13 @@ if (typeof window !== 'undefined') {
     // Convenience methods that delegate to instance
     captureError: (error, metadata) => instance?.captureError(error, metadata),
     openWidget: () => {
-      // Open the feedback widget if mounted
       const trigger = document.querySelector('[data-britepulse-trigger]') as HTMLButtonElement;
-      if (trigger) trigger.click();
+      if (trigger) {
+        trigger.click();
+        return true;
+      }
+      console.warn('[BritePulse] Widget trigger not found - is the widget mounted?');
+      return false;
     },
   };
 }

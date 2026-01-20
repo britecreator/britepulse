@@ -48,28 +48,6 @@ function normalizeError(
 }
 
 /**
- * Handle window.onerror events
- */
-function handleWindowError(
-  message: Event | string,
-  source?: string,
-  lineno?: number,
-  colno?: number,
-  error?: Error
-): boolean {
-  if (!errorHandler) return false;
-
-  const errorData = error
-    ? normalizeError(error, source, lineno, colno)
-    : normalizeError(String(message), source, lineno, colno);
-
-  errorHandler(errorData);
-
-  // Don't prevent default error handling
-  return false;
-}
-
-/**
  * Handle unhandledrejection events
  */
 function handleUnhandledRejection(event: PromiseRejectionEvent): void {

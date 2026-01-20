@@ -84,8 +84,9 @@ export interface IssueCounts {
 }
 
 export interface IssueTimestamps {
-  first_seen: string;
-  last_seen: string;
+  created_at: string;
+  last_seen_at: string;
+  resolved_at?: string;
 }
 
 export interface FixOption {
