@@ -30,7 +30,6 @@ export default function AppDetailPage() {
   const [showKeys, setShowKeys] = useState<string | null>(null);
   const [rotatedKeys, setRotatedKeys] = useState<{ env: string; public_key: string; server_key: string } | null>(null);
   const [briefFrequency, setBriefFrequency] = useState<BriefFrequency>('disabled');
-  const [briefTime, setBriefTime] = useState<string>('08:00');
   const [savingSchedule, setSavingSchedule] = useState(false);
 
   // Initialize brief settings from app data
@@ -44,7 +43,6 @@ export default function AppDetailPage() {
       } else {
         setBriefFrequency('daily');
       }
-      setBriefTime(schedule?.daily_brief_time_local || '08:00');
     }
   }, [app]);
 
@@ -56,8 +54,8 @@ export default function AppDetailPage() {
         await updateSchedules.mutateAsync({});
       } else {
         await updateSchedules.mutateAsync({
-          daily_brief_time_local: briefTime,
-          daily_brief_timezone: app?.schedules?.daily_brief_timezone || 'America/Chicago',
+          daily_brief_time_local: '05:00',
+          daily_brief_timezone: 'America/Chicago',
           daily_brief_max_items: app?.schedules?.daily_brief_max_items || 10,
           daily_brief_min_items: app?.schedules?.daily_brief_min_items || 5,
           daily_brief_recipients: app?.schedules?.daily_brief_recipients || app?.owners?.po_emails || [],
@@ -144,10 +142,14 @@ Add this script tag to your HTML \`<head>\`:
   src="${apiUrl}/sdk.js"
   data-api-key="${prodKey}"
   data-api-url="${apiUrl}"
-  data-environment="production"
   defer
 ></script>
 \`\`\`
+
+That's it! The SDK will automatically:
+- Show a feedback button in the bottom-right corner
+- Capture uncaught JavaScript errors
+- Track user sessions
 
 ## Configuration
 
@@ -158,7 +160,9 @@ Add this script tag to your HTML \`<head>\`:
 | Public Key (prod) | \`${prodKey}\` |
 ${stageKey ? `| Public Key (stage) | \`${stageKey}\` |` : ''}
 
-## React Integration
+## Manual Initialization (React/SPA)
+
+If you need more control, initialize manually instead of using data attributes:
 
 \`\`\`tsx
 // Add to your app's entry point (e.g., main.tsx or App.tsx)
@@ -167,29 +171,49 @@ import { useEffect } from 'react';
 declare global {
   interface Window {
     BritePulse?: {
-      init: (config: any) => void;
-      setUser: (user: any) => void;
-      captureError: (error: Error, context?: any) => void;
-      openWidget: (options?: any) => void;
+      init: (config: {
+        apiKey: string;
+        apiUrl?: string;
+        version?: string;
+        user?: { id?: string; role?: string; email?: string };
+        captureErrors?: boolean;
+        enableWidget?: boolean;
+        widgetPosition?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+        widgetButtonText?: string;
+        debug?: boolean;
+      }) => void;
+      getInstance: () => {
+        setUser: (user: { id?: string; role?: string; email?: string } | undefined) => void;
+        captureError: (error: Error | string, metadata?: Record<string, unknown>) => void;
+        captureComponentError: (error: Error, componentStack: string) => void;
+      } | null;
+      captureError: (error: Error | string, metadata?: Record<string, unknown>) => void;
+      openWidget: () => void;
     };
   }
 }
 
 function App() {
   useEffect(() => {
+    // Wait for SDK script to load, then initialize
     const initBritePulse = () => {
       window.BritePulse?.init({
         apiKey: '${prodKey}',
         apiUrl: '${apiUrl}',
-        environment: 'production',
+        // Optional settings:
+        // version: '1.0.0',
+        // widgetPosition: 'bottom-right',
+        // widgetButtonText: 'Feedback',
+        // debug: true,
       });
     };
 
     if (window.BritePulse) {
       initBritePulse();
     } else {
-      window.addEventListener('britepulse:ready', initBritePulse);
-      return () => window.removeEventListener('britepulse:ready', initBritePulse);
+      // SDK not loaded yet, wait for script
+      const script = document.querySelector('script[src*="sdk.js"]');
+      script?.addEventListener('load', initBritePulse);
     }
   }, []);
 
@@ -197,9 +221,9 @@ function App() {
 }
 \`\`\`
 
-## Error Boundary (Optional)
+## Error Boundary (React)
 
-Capture React errors automatically:
+Capture React component errors:
 
 \`\`\`tsx
 import { Component, ErrorInfo, ReactNode } from 'react';
@@ -215,9 +239,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    window.BritePulse?.captureError(error, {
-      componentStack: errorInfo.componentStack,
-    });
+    // Use captureComponentError for React errors (includes component stack)
+    window.BritePulse?.getInstance()?.captureComponentError(
+      error,
+      errorInfo.componentStack || ''
+    );
   }
 
   render() {
@@ -232,22 +258,37 @@ export class ErrorBoundary extends Component<Props, State> {
 ## API Methods
 
 \`\`\`typescript
-// Update user after login
-window.BritePulse?.setUser({ userId: user.id, email: user.email });
+// Set user context after login
+window.BritePulse?.getInstance()?.setUser({
+  id: user.id,
+  email: user.email,
+  role: user.role,  // optional
+});
 
-// Manual error capture
-window.BritePulse?.captureError(error, { context: 'checkout' });
+// Clear user on logout
+window.BritePulse?.getInstance()?.setUser(undefined);
 
-// Open feedback widget
+// Manual error capture with metadata
+window.BritePulse?.captureError(error, {
+  context: 'checkout',
+  orderId: '12345',
+});
+
+// Open feedback widget programmatically
 window.BritePulse?.openWidget();
-window.BritePulse?.openWidget({ type: 'bug' }); // Pre-select type
 \`\`\`
 
 ## Staging Environment
 
-To use staging instead of production, change:
-- \`data-environment="staging"\`
-${stageKey ? `- Use public key: \`${stageKey}\`` : '- Generate staging keys in the BritePulse console'}
+To use staging instead of production, use the staging public key:
+${stageKey ? `\`\`\`html
+<script
+  src="${apiUrl}/sdk.js"
+  data-api-key="${stageKey}"
+  data-api-url="${apiUrl}"
+  defer
+></script>
+\`\`\`` : '- Generate staging keys in the BritePulse console first'}
 
 ---
 
@@ -432,17 +473,9 @@ ${stageKey ? `- Use public key: \`${stageKey}\`` : '- Generate staging keys in t
           {briefFrequency !== 'disabled' && (
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">Send Time</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="time"
-                  className="input w-32"
-                  value={briefTime}
-                  onChange={(e) => setBriefTime(e.target.value)}
-                />
-                <span className="text-sm text-gray-500">
-                  ({app.schedules?.daily_brief_timezone || 'America/Chicago'})
-                </span>
-              </div>
+              <p className="text-sm text-gray-500">
+                5:00 AM (America/Chicago)
+              </p>
             </div>
           )}
 

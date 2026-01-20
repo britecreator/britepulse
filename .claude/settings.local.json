@@ -85,7 +85,8 @@
       "Bash(gh run view:*)",
       "Bash(gcloud run services logs read:*)",
       "Bash(gcloud.cmd run services logs read:*)",
-      "Bash(gh.exe run list:*)"
+      "Bash(gh.exe run list:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

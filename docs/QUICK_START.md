@@ -24,7 +24,7 @@ Add feedback collection and error monitoring to your BriteCo web app in under 5 
 1. Click **Configure** on your newly created app
 2. Scroll to **Install Keys**
 3. Click **Show Keys** for your environment (dev, stage, or prod)
-4. Copy the **Public Key** (you'll need this in the next step)
+4. Copy the **Public Key** (starts with `pk_`)
 
 > **Note**: If no keys exist, click **Rotate Keys** to generate them.
 
@@ -32,36 +32,47 @@ Add feedback collection and error monitoring to your BriteCo web app in under 5 
 
 ## Step 3: Add the SDK to Your App
 
-Add these two lines to your HTML, just before the closing `</body>` tag:
+Add this script tag to your HTML `<head>`:
+
+```html
+<script
+  src="https://britepulse-api-29820647719.us-central1.run.app/sdk.js"
+  data-api-key="YOUR_PUBLIC_KEY_HERE"
+  data-api-url="https://britepulse-api-29820647719.us-central1.run.app"
+  defer
+></script>
+```
+
+Replace `YOUR_PUBLIC_KEY_HERE` with the public key from Step 2.
+
+That's it! The SDK will automatically:
+- Show a **Feedback** button in the bottom-right corner
+- Capture uncaught JavaScript errors
+- Track user sessions
+
+### Optional: Manual Initialization
+
+For more control (e.g., in React/Vue/Angular apps), initialize manually:
 
 ```html
 <script src="https://britepulse-api-29820647719.us-central1.run.app/sdk.js"></script>
 <script>
   BritePulse.init({
-    publicKey: 'YOUR_PUBLIC_KEY_HERE',
-    environment: 'prod'  // or 'dev', 'stage'
-  });
-</script>
-```
-
-Replace `YOUR_PUBLIC_KEY_HERE` with the public key from Step 2.
-
-### Optional Configuration
-
-```html
-<script>
-  BritePulse.init({
-    publicKey: 'YOUR_PUBLIC_KEY_HERE',
-    environment: 'prod',
+    apiKey: 'YOUR_PUBLIC_KEY_HERE',
+    apiUrl: 'https://britepulse-api-29820647719.us-central1.run.app',
 
     // Optional settings:
-    version: '1.2.3',           // Your app version
-    userId: 'user@brite.co',    // Current user (for tracking)
-    userRole: 'admin',          // User's role
-
-    // Widget customization:
-    position: 'bottom-right',   // bottom-right, bottom-left, top-right, top-left
-    buttonText: 'Feedback',     // Custom button text
+    version: '1.2.3',                    // Your app version
+    user: {
+      id: 'user@brite.co',               // Current user ID
+      email: 'user@brite.co',            // User email
+      role: 'admin',                     // User's role
+    },
+    widgetPosition: 'bottom-right',      // bottom-right, bottom-left, top-right, top-left
+    widgetButtonText: 'Feedback',        // Custom button text
+    captureErrors: true,                 // Enable/disable error capture
+    enableWidget: true,                  // Enable/disable feedback widget
+    debug: false,                        // Enable console logging
   });
 </script>
 ```
@@ -97,12 +108,37 @@ This error should appear in the BritePulse Console within a few seconds.
 
 ---
 
+## API Methods
+
+```javascript
+// Set user after login
+BritePulse.getInstance()?.setUser({
+  id: 'user123',
+  email: 'user@brite.co',
+  role: 'admin'
+});
+
+// Clear user on logout
+BritePulse.getInstance()?.setUser(undefined);
+
+// Manual error capture with metadata
+BritePulse.captureError(new Error('Something failed'), {
+  context: 'checkout',
+  orderId: '12345'
+});
+
+// Open feedback widget programmatically
+BritePulse.openWidget();
+```
+
+---
+
 ## Troubleshooting
 
 ### Widget doesn't appear
 
 - Check browser console for errors
-- Verify your public key is correct
+- Verify your public key is correct (starts with `pk_`)
 - Make sure the SDK script loaded (check Network tab)
 
 ### Feedback not showing in console
@@ -119,9 +155,9 @@ This error should appear in the BritePulse Console within a few seconds.
 
 ## Next Steps
 
-- **Configure AI Triage**: Enable automatic issue analysis in App settings
+- **Download Integration Guide**: Get a customized guide for your app from the Admin page
 - **Set Up Daily Brief**: Configure email notifications for your team
-- **Add More Owners**: Share access with your team members
+- **Add Owners**: Share access with your team members
 
 ---
 

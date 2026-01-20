@@ -5,7 +5,7 @@
 
 import type { BritePulseConfig, EventPayload, FeedbackData, ErrorData, ContextData } from './types.js';
 
-const DEFAULT_API_URL = 'https://api.britepulse.io';
+const DEFAULT_API_URL = 'https://britepulse-api-29820647719.us-central1.run.app';
 
 /**
  * Build user object with only defined values (Firestore-safe)
