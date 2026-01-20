@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useApp, useUpdateApp, useRotateKeys } from '../../hooks/useApi';
+import { useApp, useUpdateApp, useRotateKeys, useUpdateAppSchedules } from '../../hooks/useApi';
+
+type BriefFrequency = 'disabled' | 'daily' | 'only_on_issues' | 'instant';
 
 interface InstallKeys {
   public_key: string;
@@ -21,11 +23,51 @@ export default function AppDetailPage() {
   const { data: app, isLoading, error } = useApp(appId!);
   const updateApp = useUpdateApp(appId!);
   const rotateKeys = useRotateKeys(appId!);
+  const updateSchedules = useUpdateAppSchedules(appId!);
 
   const [editingOwners, setEditingOwners] = useState(false);
   const [newOwner, setNewOwner] = useState('');
   const [showKeys, setShowKeys] = useState<string | null>(null);
   const [rotatedKeys, setRotatedKeys] = useState<{ env: string; public_key: string; server_key: string } | null>(null);
+  const [briefFrequency, setBriefFrequency] = useState<BriefFrequency>('disabled');
+  const [briefTime, setBriefTime] = useState<string>('08:00');
+  const [savingSchedule, setSavingSchedule] = useState(false);
+
+  // Initialize brief settings from app data
+  useEffect(() => {
+    if (app) {
+      const schedule = app.schedules;
+      if (!schedule?.daily_brief_time_local) {
+        setBriefFrequency('disabled');
+      } else if (schedule.brief_mode === 'only_on_issues') {
+        setBriefFrequency('only_on_issues');
+      } else {
+        setBriefFrequency('daily');
+      }
+      setBriefTime(schedule?.daily_brief_time_local || '08:00');
+    }
+  }, [app]);
+
+  async function handleSaveSchedule() {
+    setSavingSchedule(true);
+    try {
+      if (briefFrequency === 'disabled') {
+        // Clear schedule by sending empty object (API will handle clearing)
+        await updateSchedules.mutateAsync({});
+      } else {
+        await updateSchedules.mutateAsync({
+          daily_brief_time_local: briefTime,
+          daily_brief_timezone: app?.schedules?.daily_brief_timezone || 'America/Chicago',
+          daily_brief_max_items: app?.schedules?.daily_brief_max_items || 10,
+          daily_brief_min_items: app?.schedules?.daily_brief_min_items || 5,
+          daily_brief_recipients: app?.schedules?.daily_brief_recipients || app?.owners?.po_emails || [],
+          brief_mode: briefFrequency === 'only_on_issues' ? 'only_on_issues' : 'daily',
+        });
+      }
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -340,25 +382,6 @@ ${stageKey ? `- Use public key: \`${stageKey}\`` : '- Generate staging keys in t
         <div className="divide-y divide-gray-200">
           <div className="px-4 py-5 sm:px-6 flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-medium text-gray-900">AI Triage</h3>
-              <p className="text-sm text-gray-500">
-                {app.policies?.ai_policy ? (
-                  <>Min severity: {app.policies.ai_policy.eligible_severity_min}, Min occurrences: {app.policies.ai_policy.eligible_recurrence_min}</>
-                ) : (
-                  'Not configured'
-                )}
-              </p>
-            </div>
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                app.policies?.ai_policy ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              {app.policies?.ai_policy ? 'Configured' : 'Default'}
-            </span>
-          </div>
-          <div className="px-4 py-5 sm:px-6 flex items-center justify-between">
-            <div>
               <h3 className="text-sm font-medium text-gray-900">Redaction Profile</h3>
               <p className="text-sm text-gray-500">
                 {app.policies?.redaction_profile || 'standard'}
@@ -383,26 +406,67 @@ ${stageKey ? `- Use public key: \`${stageKey}\`` : '- Generate staging keys in t
       <div className="card">
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">Schedules</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Configure when to send email summaries to owners
+          </p>
         </div>
-        <div className="divide-y divide-gray-200">
-          <div className="px-4 py-5 sm:px-6 flex items-center justify-between">
+        <div className="px-4 py-5 sm:px-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">Daily Brief</label>
+            <select
+              className="input w-full max-w-md"
+              value={briefFrequency}
+              onChange={(e) => setBriefFrequency(e.target.value as BriefFrequency)}
+            >
+              <option value="disabled">Disabled</option>
+              <option value="daily">Every day at scheduled time</option>
+              <option value="only_on_issues">Daily, only when there are new submissions</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              {briefFrequency === 'disabled' && 'No email summaries will be sent'}
+              {briefFrequency === 'daily' && 'Send summary every day, even if there are no new issues'}
+              {briefFrequency === 'only_on_issues' && 'Send summary only on days with new submissions'}
+            </p>
+          </div>
+
+          {briefFrequency !== 'disabled' && (
             <div>
-              <h3 className="text-sm font-medium text-gray-900">Daily Brief</h3>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Send Time</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  className="input w-32"
+                  value={briefTime}
+                  onChange={(e) => setBriefTime(e.target.value)}
+                />
+                <span className="text-sm text-gray-500">
+                  ({app.schedules?.daily_brief_timezone || 'America/Chicago'})
+                </span>
+              </div>
+            </div>
+          )}
+
+          {briefFrequency !== 'disabled' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Recipients</label>
               <p className="text-sm text-gray-500">
-                {app.schedules?.daily_brief_time_local ? (
-                  <>{app.schedules.daily_brief_time_local} ({app.schedules.daily_brief_timezone || 'America/Chicago'})</>
-                ) : (
-                  'Not scheduled'
-                )}
+                {(app.schedules?.daily_brief_recipients?.length || 0) > 0
+                  ? app.schedules?.daily_brief_recipients?.join(', ')
+                  : ownerEmails.length > 0
+                    ? `${ownerEmails.join(', ')} (from owners)`
+                    : 'No recipients configured - add owners above'}
               </p>
             </div>
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                app.schedules?.daily_brief_time_local ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-              }`}
+          )}
+
+          <div className="pt-2">
+            <button
+              onClick={handleSaveSchedule}
+              disabled={savingSchedule}
+              className="btn-primary"
             >
-              {app.schedules?.daily_brief_time_local ? 'Enabled' : 'Disabled'}
-            </span>
+              {savingSchedule ? 'Saving...' : 'Save Schedule'}
+            </button>
           </div>
         </div>
       </div>

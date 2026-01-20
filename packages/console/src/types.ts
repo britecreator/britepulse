@@ -59,6 +59,7 @@ export interface Schedule {
   daily_brief_max_items?: number;
   daily_brief_min_items?: number;
   daily_brief_recipients?: string[];
+  brief_mode?: 'daily' | 'only_on_issues';
 }
 
 export interface App {

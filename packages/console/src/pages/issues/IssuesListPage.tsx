@@ -6,6 +6,29 @@ import type { IssueStatus, Severity, Environment, Issue } from '../../types';
 const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'wont_fix'];
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3'];
 
+// Format date for display (e.g., "Jan 20, 2:30 PM" or "Jan 20, 2025" if older)
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '-';
+
+  const now = new Date();
+  const isThisYear = date.getFullYear() === now.getFullYear();
+
+  if (isThisYear) {
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 export default function IssuesListPage() {
   const [filters, setFilters] = useState({
     app_id: '',
@@ -189,10 +212,10 @@ export default function IssuesListPage() {
                     Reported By
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    Submitted
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Priority
+                    Status
                   </th>
                 </tr>
               </thead>
@@ -242,13 +265,13 @@ export default function IssuesListPage() {
                         issue.reported_by?.user_id ||
                         'Anonymous'}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDate(issue.timestamps.created_at)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`badge-${issue.status}`}>
                         {issue.status.replace('_', ' ')}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {issue.priority_score?.toFixed(0) ?? '-'}
                     </td>
                   </tr>
                 ))}

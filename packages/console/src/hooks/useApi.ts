@@ -31,8 +31,21 @@ async function fetchApi<T>(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || `HTTP ${response.status}`);
+    const errorBody = await response.json().catch(() => ({ message: 'Request failed' }));
+    const errorMessage = errorBody.message || `HTTP ${response.status}`;
+
+    // Report server errors (5xx) to BritePulse for monitoring
+    if (response.status >= 500) {
+      const error = new Error(`API Error: ${errorMessage}`);
+      window.BritePulse?.getInstance()?.captureError(error, {
+        endpoint: path,
+        method: options.method || 'GET',
+        status: response.status,
+        errorCode: errorBody.code,
+      });
+    }
+
+    throw new Error(errorMessage);
   }
 
   return response.json();
@@ -95,6 +108,28 @@ export function useRotateKeys(appId: string) {
         }
       ).then((r) => r.data),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apps', appId] });
+    },
+  });
+}
+
+export function useUpdateAppSchedules(appId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (schedules: {
+      daily_brief_time_local?: string;
+      daily_brief_timezone?: string;
+      daily_brief_max_items?: number;
+      daily_brief_min_items?: number;
+      daily_brief_recipients?: string[];
+      brief_mode?: 'daily' | 'only_on_issues';
+    } | null) =>
+      fetchApi<{ data: App }>(`/admin/apps/${appId}/schedules`, {
+        method: 'PATCH',
+        body: JSON.stringify(schedules || {}),
+      }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apps'] });
       queryClient.invalidateQueries({ queryKey: ['apps', appId] });
     },
   });
@@ -195,10 +230,10 @@ export function useTriageIssue(issueId: string) {
 export function useMergeIssues() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ targetId, sourceIds }: { targetId: string; sourceIds: string[] }) =>
+    mutationFn: ({ targetId, sourceIds, reason }: { targetId: string; sourceIds: string[]; reason?: string }) =>
       fetchApi<{ data: Issue }>(`/issues/${targetId}/actions/merge`, {
         method: 'POST',
-        body: JSON.stringify({ source_issue_ids: sourceIds }),
+        body: JSON.stringify({ source_issue_ids: sourceIds, reason: reason || 'Issues merged via console' }),
       }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });

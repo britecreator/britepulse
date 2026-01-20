@@ -459,6 +459,62 @@ router.get(
 );
 
 /**
+ * POST /issues/:issue_id/actions/merge
+ * Merge source issues into this target issue
+ */
+router.post(
+  '/:issue_id/actions/merge',
+  requirePermission('change_status'),
+  asyncHandler(async (req, res) => {
+    const { issue_id: targetIssueId } = req.params;
+    const { source_issue_ids, reason } = req.body;
+
+    if (!source_issue_ids || !Array.isArray(source_issue_ids) || source_issue_ids.length === 0) {
+      throw APIError.badRequest('source_issue_ids must be a non-empty array');
+    }
+
+    if (!reason) {
+      throw APIError.badRequest('reason is required');
+    }
+
+    // Verify target issue exists
+    const targetIssue = await firestoreService.getIssue(targetIssueId);
+    if (!targetIssue) {
+      throw APIError.notFound('Target issue');
+    }
+
+    // Check app access for target
+    const accessibleAppIds = getAccessibleAppIds(req);
+    if (accessibleAppIds && !accessibleAppIds.includes(targetIssue.app_id)) {
+      throw APIError.forbidden('Access to target issue is denied');
+    }
+
+    // Verify all source issues exist and user has access
+    for (const sourceId of source_issue_ids) {
+      const sourceIssue = await firestoreService.getIssue(sourceId);
+      if (!sourceIssue) {
+        throw APIError.notFound(`Source issue ${sourceId}`);
+      }
+      if (accessibleAppIds && !accessibleAppIds.includes(sourceIssue.app_id)) {
+        throw APIError.forbidden(`Access to source issue ${sourceId} is denied`);
+      }
+      if (sourceIssue.app_id !== targetIssue.app_id) {
+        throw APIError.badRequest('All issues must belong to the same app');
+      }
+    }
+
+    const updatedIssue = await firestoreService.mergeIssues(targetIssueId, source_issue_ids);
+
+    await logAuditAction(req, 'merge_issues', 'issue', targetIssueId, {
+      source_issue_ids,
+      reason,
+    });
+
+    res.json({ data: updatedIssue });
+  })
+);
+
+/**
  * POST /issues/:issue_id/actions/triage
  * Manually trigger AI triage analysis
  */
