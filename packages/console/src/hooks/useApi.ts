@@ -72,10 +72,10 @@ export function useUpdateApp(appId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<App>) =>
-      fetchApi<{ app: App }>(`/admin/apps/${appId}`, {
+      fetchApi<{ data: App }>(`/admin/apps/${appId}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
-      }),
+      }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['apps'] });
       queryClient.invalidateQueries({ queryKey: ['apps', appId] });
@@ -87,13 +87,13 @@ export function useRotateKeys(appId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (environment: string) =>
-      fetchApi<{ keys: { public_key: string; server_key: string } }>(
+      fetchApi<{ data: { public_key: string; server_key: string } }>(
         `/admin/apps/${appId}/rotate-keys`,
         {
           method: 'POST',
           body: JSON.stringify({ environment }),
         }
-      ),
+      ).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['apps', appId] });
     },
@@ -182,10 +182,10 @@ export function useTriageIssue(issueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (force: boolean = false) =>
-      fetchApi<{ success: boolean; analysis?: unknown }>(`/issues/${issueId}/triage`, {
+      fetchApi<{ data: { success: boolean; analysis?: unknown } }>(`/issues/${issueId}/actions/triage`, {
         method: 'POST',
         body: JSON.stringify({ force }),
-      }),
+      }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues', issueId] });
     },
@@ -196,10 +196,10 @@ export function useMergeIssues() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ targetId, sourceIds }: { targetId: string; sourceIds: string[] }) =>
-      fetchApi<{ issue: Issue }>(`/issues/${targetId}/merge`, {
+      fetchApi<{ data: Issue }>(`/issues/${targetId}/actions/merge`, {
         method: 'POST',
         body: JSON.stringify({ source_issue_ids: sourceIds }),
-      }),
+      }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
     },

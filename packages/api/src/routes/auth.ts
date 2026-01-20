@@ -76,11 +76,18 @@ router.get(
       // Update last login
       await firestoreService.updateUser(user.user_id, {});
 
+      // Validate redirect URL to prevent open redirect attacks
+      let redirectPath = '/';
+      if (state && typeof state === 'string') {
+        // Only allow relative paths starting with /
+        // Reject absolute URLs and protocol-relative URLs
+        if (state.startsWith('/') && !state.startsWith('//')) {
+          redirectPath = state;
+        }
+      }
+
       // Redirect to console with token
-      const redirectUrl = new URL(
-        state as string || '/',
-        config.consoleBaseUrl
-      );
+      const redirectUrl = new URL(redirectPath, config.consoleBaseUrl);
       redirectUrl.searchParams.set('token', tokens.id_token!);
 
       res.redirect(redirectUrl.toString());

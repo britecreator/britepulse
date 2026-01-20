@@ -162,7 +162,8 @@ export function containsPII(text: string, profile: RedactionProfile = 'standard'
   const patternsToCheck = PROFILE_PATTERNS[profile];
 
   for (const type of patternsToCheck) {
-    const pattern = REDACTION_PATTERNS[type];
+    // Create new RegExp to avoid lastIndex issues with global patterns
+    const pattern = new RegExp(REDACTION_PATTERNS[type].source, REDACTION_PATTERNS[type].flags);
     if (pattern.test(text)) {
       return true;
     }
@@ -202,8 +203,9 @@ export function validateForAI(text: string): {
 } {
   const violations: RedactionType[] = [];
 
-  // Always check for secrets
-  if (REDACTION_PATTERNS.secret.test(text)) {
+  // Always check for secrets (create new RegExp to avoid lastIndex issues)
+  const secretPattern = new RegExp(REDACTION_PATTERNS.secret.source, REDACTION_PATTERNS.secret.flags);
+  if (secretPattern.test(text)) {
     violations.push('secret');
   }
 

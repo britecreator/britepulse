@@ -46,12 +46,48 @@ app.set('trust proxy', 1);
 app.use(helmet({
   contentSecurityPolicy: config.nodeEnv === 'production' ? undefined : false, // Disable CSP in dev for test page
 }));
-app.use(
-  cors({
-    origin: config.nodeEnv === 'production' ? config.consoleBaseUrl : true,
-    credentials: true,
-  })
-);
+
+// CORS configuration
+// In production, allow console + any configured SDK origins
+// In development, allow all origins
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (config.nodeEnv !== 'production') {
+      // Allow all in development
+      callback(null, true);
+      return;
+    }
+
+    // Always allow requests with no origin (server-to-server, curl, etc.)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    // Allow console
+    if (origin === config.consoleBaseUrl) {
+      callback(null, true);
+      return;
+    }
+
+    // Allow configured SDK origins
+    if (config.corsAllowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    // For /events endpoint, be more permissive - SDK can come from any customer app
+    // The API key validation will ensure only valid apps can ingest
+    // This is checked per-route below
+    callback(null, false);
+  },
+  credentials: true,
+};
+app.use(cors(corsOptions));
+
+// More permissive CORS for /events endpoint (SDK ingestion)
+// API key validation ensures security
+app.use('/events', cors({ origin: true }));
 
 // Request parsing
 app.use(express.json({ limit: '1mb' }));

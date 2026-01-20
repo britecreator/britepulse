@@ -136,18 +136,15 @@ export function apiKeyAuth(keyType: 'public' | 'server' | 'any' = 'any') {
       return next(APIError.unauthorized('Invalid API key format'));
     }
 
-    // TODO: Look up key in database and get app_id
-    // For now, extract app_id from key (format: pk_<app_id>_<random> or sk_<app_id>_<random>)
-    const keyParts = apiKey.key.slice(3).split('_');
-    const appId = keyParts.length >= 2 ? keyParts[0] : null;
-
-    if (!appId) {
+    // Validate API key against database
+    const validation = await firestoreService.validateApiKey(apiKey.key, apiKey.type);
+    if (!validation.valid || !validation.appId) {
       return next(APIError.unauthorized('Invalid API key'));
     }
 
     req.auth = {
       type: apiKey.type === 'public' ? 'public_key' : 'server_key',
-      appId,
+      appId: validation.appId,
     };
 
     next();

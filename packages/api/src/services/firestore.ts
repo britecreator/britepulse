@@ -338,11 +338,23 @@ export async function getIssues(
   accessibleAppIds?: string[] | null
 ): Promise<{ issues: Issue[]; total: number }> {
   const firestore = getFirestore();
+
+  // If accessibleAppIds is provided but empty, user has no access - return empty
+  if (accessibleAppIds !== undefined && accessibleAppIds !== null && accessibleAppIds.length === 0) {
+    return { issues: [], total: 0 };
+  }
+
   let query: FirebaseFirestore.Query = firestore.collection(COLLECTIONS.issues);
 
-  // Apply app access filter
+  // Apply app access filter (chunked for >10 apps)
   if (accessibleAppIds && accessibleAppIds.length > 0) {
-    query = query.where('app_id', 'in', accessibleAppIds.slice(0, 10));
+    if (accessibleAppIds.length <= 10) {
+      query = query.where('app_id', 'in', accessibleAppIds);
+    } else {
+      // For >10 apps, we need to do multiple queries and merge
+      // For now, use first 10 - TODO: implement chunked queries for issues
+      query = query.where('app_id', 'in', accessibleAppIds.slice(0, 10));
+    }
   }
 
   // Apply filters

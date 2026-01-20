@@ -88,11 +88,15 @@ router.get(
     }
 
     // Fetch install keys for each environment
-    const install_keys: Record<string, { public_key: string; server_key: string; key_rotated_at: string }> = {};
+    // Only Admins can see server keys
+    const isAdmin = user.role === 'Admin';
+    const install_keys: Record<string, { public_key: string; server_key?: string; key_rotated_at: string }> = {};
     for (const env of app.environments) {
       const keys = await firestoreService.getInstallKeys(app_id, env.env_name);
       if (keys) {
-        install_keys[env.env_name] = keys;
+        install_keys[env.env_name] = isAdmin
+          ? keys
+          : { public_key: keys.public_key, key_rotated_at: keys.key_rotated_at };
       }
     }
 

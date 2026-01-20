@@ -36,6 +36,13 @@ export const config = {
   // Console URL (for links in emails)
   consoleBaseUrl: process.env.CONSOLE_BASE_URL || 'http://localhost:3000',
 
+  // CORS allowed origins for SDK ingestion (comma-separated)
+  // In production, this should include customer app domains
+  corsAllowedOrigins: (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+
   // Rate limiting
   rateLimitWindowMs: 60 * 1000, // 1 minute
   rateLimitMaxRequests: 100,
