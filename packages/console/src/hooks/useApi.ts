@@ -135,6 +135,16 @@ export function useUpdateAppSchedules(appId: string) {
   });
 }
 
+export function useSendTestBrief(appId: string) {
+  return useMutation({
+    mutationFn: () =>
+      fetchApi<{ data: { sent: boolean; to: string; issues_included: number; error?: string } }>(
+        `/briefs/test/${appId}`,
+        { method: 'POST' }
+      ).then((r) => r.data),
+  });
+}
+
 // Issues
 export function useIssues(filters: Partial<IssueFilters> = {}) {
   const params = new URLSearchParams();

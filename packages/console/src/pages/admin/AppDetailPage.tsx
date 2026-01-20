@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useApp, useUpdateApp, useRotateKeys, useUpdateAppSchedules } from '../../hooks/useApi';
+import { useApp, useUpdateApp, useRotateKeys, useUpdateAppSchedules, useSendTestBrief } from '../../hooks/useApi';
 
 type BriefFrequency = 'disabled' | 'daily' | 'only_on_issues' | 'instant';
 
@@ -24,6 +24,7 @@ export default function AppDetailPage() {
   const updateApp = useUpdateApp(appId!);
   const rotateKeys = useRotateKeys(appId!);
   const updateSchedules = useUpdateAppSchedules(appId!);
+  const sendTestBrief = useSendTestBrief(appId!);
 
   const [editingOwners, setEditingOwners] = useState(false);
   const [newOwner, setNewOwner] = useState('');
@@ -31,6 +32,7 @@ export default function AppDetailPage() {
   const [rotatedKeys, setRotatedKeys] = useState<{ env: string; public_key: string; server_key: string } | null>(null);
   const [briefFrequency, setBriefFrequency] = useState<BriefFrequency>('disabled');
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [testEmailStatus, setTestEmailStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Initialize brief settings from app data
   useEffect(() => {
@@ -492,7 +494,7 @@ ${stageKey ? `\`\`\`html
             </div>
           )}
 
-          <div className="pt-2">
+          <div className="pt-2 flex items-center gap-3">
             <button
               onClick={handleSaveSchedule}
               disabled={savingSchedule}
@@ -500,7 +502,46 @@ ${stageKey ? `\`\`\`html
             >
               {savingSchedule ? 'Saving...' : 'Save Schedule'}
             </button>
+            <button
+              onClick={async () => {
+                setTestEmailStatus(null);
+                try {
+                  const result = await sendTestBrief.mutateAsync();
+                  if (result.sent) {
+                    setTestEmailStatus({
+                      type: 'success',
+                      message: `Test email sent to ${result.to} with ${result.issues_included} issues`,
+                    });
+                  } else {
+                    setTestEmailStatus({
+                      type: 'error',
+                      message: result.error || 'Failed to send test email',
+                    });
+                  }
+                } catch (err) {
+                  setTestEmailStatus({
+                    type: 'error',
+                    message: err instanceof Error ? err.message : 'Failed to send test email',
+                  });
+                }
+              }}
+              disabled={sendTestBrief.isPending}
+              className="btn-ghost"
+            >
+              {sendTestBrief.isPending ? 'Sending...' : 'Send Test Email'}
+            </button>
           </div>
+          {testEmailStatus && (
+            <div
+              className={`mt-3 p-3 rounded-md text-sm ${
+                testEmailStatus.type === 'success'
+                  ? 'bg-green-50 text-green-800'
+                  : 'bg-red-50 text-red-800'
+              }`}
+            >
+              {testEmailStatus.message}
+            </div>
+          )}
         </div>
       </div>
 
