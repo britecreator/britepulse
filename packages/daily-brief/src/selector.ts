@@ -18,7 +18,7 @@ export interface SelectionConfig {
 export const DEFAULT_SELECTION_CONFIG: SelectionConfig = {
   maxItems: 10,
   minItems: 5,
-  minSeverity: 'P2',
+  minSeverity: 'P3',  // Include all severities by default
   includeResolved24h: true,
 };
 

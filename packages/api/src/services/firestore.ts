@@ -451,11 +451,13 @@ export async function getIssues(
               : sort.field;
 
   // Check if we need memory filtering
-  const needsMemoryFilter = Object.keys(memoryFilters).length > 0;
+  // Also use memory filtering when 'in' clause is used, because Firestore requires
+  // composite indexes for 'in' + orderBy combinations that we may not have
+  const needsMemoryFilter = Object.keys(memoryFilters).length > 0 || usedInClause;
 
   if (needsMemoryFilter) {
-    // Fetch all matching docs and filter in memory
-    query = query.orderBy(sortField, sort.direction);
+    // Fetch all matching docs and filter/sort in memory
+    // Don't use orderBy with 'in' clause to avoid missing index errors
     const snapshot = await query.get();
     let allIssues = snapshot.docs.map((doc) => doc.data() as Issue);
 
@@ -472,6 +474,41 @@ export async function getIssues(
     if (memoryFilters.issue_type) {
       allIssues = allIssues.filter((i) => memoryFilters.issue_type!.includes(i.issue_type));
     }
+
+    // Sort in memory
+    allIssues.sort((a, b) => {
+      let aVal: string | number;
+      let bVal: string | number;
+
+      switch (sortField) {
+        case 'severity':
+          // P0 < P1 < P2 < P3 for ascending
+          aVal = ['P0', 'P1', 'P2', 'P3'].indexOf(a.severity);
+          bVal = ['P0', 'P1', 'P2', 'P3'].indexOf(b.severity);
+          break;
+        case 'counts.occurrences_24h':
+          aVal = a.counts.occurrences_24h;
+          bVal = b.counts.occurrences_24h;
+          break;
+        case 'counts.unique_users_24h_est':
+          aVal = a.counts.unique_users_24h_est;
+          bVal = b.counts.unique_users_24h_est;
+          break;
+        case 'timestamps.last_seen_at':
+          aVal = new Date(a.timestamps.last_seen_at).getTime();
+          bVal = new Date(b.timestamps.last_seen_at).getTime();
+          break;
+        case 'timestamps.created_at':
+          aVal = new Date(a.timestamps.created_at).getTime();
+          bVal = new Date(b.timestamps.created_at).getTime();
+          break;
+        default:
+          aVal = 0;
+          bVal = 0;
+      }
+
+      return sort.direction === 'asc' ? (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) : aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+    });
 
     const total = allIssues.length;
     const start = (page - 1) * pageSize;

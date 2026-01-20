@@ -30,10 +30,11 @@ function formatDate(dateString: string): string {
 }
 
 export default function IssuesListPage() {
+  // Default to showing all statuses except 'resolved'
   const [filters, setFilters] = useState({
     app_id: '',
     environment: '' as Environment | '',
-    status: [] as IssueStatus[],
+    status: ['new', 'triaged', 'in_progress', 'wont_fix'] as IssueStatus[],
     severity: [] as Severity[],
     search: '',
     sort_by: 'priority_score' as const,
