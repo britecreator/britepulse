@@ -12,8 +12,11 @@ export type UserRole = 'Admin' | 'PO' | 'Engineer' | 'ReadOnly';
 export interface User {
   user_id: string;
   email: string;
+  name?: string;
   role: UserRole;
   app_access?: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface EnvironmentConfig {
