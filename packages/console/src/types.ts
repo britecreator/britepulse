@@ -159,6 +159,7 @@ export interface Event {
   environment: Environment;
   event_type: EventType;
   timestamp: string;
+  route_or_url?: string;
   payload: EventPayload;
   attachment_refs?: string[];
 }
