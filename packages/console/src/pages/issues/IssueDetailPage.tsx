@@ -390,6 +390,11 @@ export default function IssueDetailPage() {
                           <span className="text-sm text-gray-500">
                             {formatDate(event.timestamp)}
                           </span>
+                          {event.route_or_url && event.route_or_url !== '/' && (
+                            <span className="text-sm text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded">
+                              {event.route_or_url}
+                            </span>
+                          )}
                         </div>
                         <span className="text-xs text-gray-400">{event.event_id}</span>
                       </div>
