@@ -160,6 +160,7 @@ export interface Event {
   event_type: EventType;
   timestamp: string;
   payload: EventPayload;
+  attachment_refs?: string[];
 }
 
 export interface IssueFilters {

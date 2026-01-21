@@ -20,6 +20,7 @@ import type {
   User,
   UserInput,
   InstallKeys,
+  Attachment,
 } from '@britepulse/shared';
 
 // Initialize Firebase Admin
@@ -64,6 +65,7 @@ const COLLECTIONS = {
   issues: 'issues',
   auditLogs: 'audit_logs',
   users: 'users',
+  attachments: 'attachments',
 } as const;
 
 // ============ App Operations ============
@@ -231,6 +233,20 @@ export async function getEvent(eventId: string): Promise<Event | null> {
   const doc = await firestore.collection(COLLECTIONS.events).doc(eventId).get();
   if (!doc.exists) return null;
   return doc.data() as Event;
+}
+
+export async function updateEvent(
+  eventId: string,
+  updates: Partial<Pick<Event, 'attachment_refs'>>
+): Promise<Event | null> {
+  const firestore = getFirestore();
+  const docRef = firestore.collection(COLLECTIONS.events).doc(eventId);
+  const doc = await docRef.get();
+  if (!doc.exists) return null;
+
+  await docRef.update(updates);
+  const updated = await docRef.get();
+  return updated.data() as Event;
 }
 
 export async function getEventsByIssue(issueId: string, limit = 100): Promise<Event[]> {
@@ -789,4 +805,76 @@ export async function validateApiKey(
   }
 
   return { valid: false };
+}
+
+// ============ Attachment Operations ============
+
+export async function createAttachment(attachment: Attachment): Promise<Attachment> {
+  const firestore = getFirestore();
+  await firestore.collection(COLLECTIONS.attachments).doc(attachment.attachment_id).set(attachment);
+  return attachment;
+}
+
+export async function getAttachment(attachmentId: string): Promise<Attachment | null> {
+  const firestore = getFirestore();
+  const doc = await firestore.collection(COLLECTIONS.attachments).doc(attachmentId).get();
+  if (!doc.exists) return null;
+  return doc.data() as Attachment;
+}
+
+export async function getAttachmentsByEventId(eventId: string): Promise<Attachment[]> {
+  const firestore = getFirestore();
+  const snapshot = await firestore
+    .collection(COLLECTIONS.attachments)
+    .where('event_id', '==', eventId)
+    .get();
+  return snapshot.docs.map((doc) => doc.data() as Attachment);
+}
+
+export async function getAttachmentsByEventIds(eventIds: string[]): Promise<Attachment[]> {
+  if (eventIds.length === 0) return [];
+
+  const firestore = getFirestore();
+  const attachments: Attachment[] = [];
+
+  // Firestore 'in' queries are limited to 10 items
+  const chunks = [];
+  for (let i = 0; i < eventIds.length; i += 10) {
+    chunks.push(eventIds.slice(i, i + 10));
+  }
+
+  for (const chunk of chunks) {
+    const snapshot = await firestore
+      .collection(COLLECTIONS.attachments)
+      .where('event_id', 'in', chunk)
+      .get();
+    attachments.push(...snapshot.docs.map((doc) => doc.data() as Attachment));
+  }
+
+  return attachments;
+}
+
+export async function deleteAttachment(attachmentId: string): Promise<boolean> {
+  const firestore = getFirestore();
+  const docRef = firestore.collection(COLLECTIONS.attachments).doc(attachmentId);
+  const doc = await docRef.get();
+  if (!doc.exists) return false;
+  await docRef.delete();
+  return true;
+}
+
+export async function deleteAttachmentsByEventId(eventId: string): Promise<number> {
+  const firestore = getFirestore();
+  const snapshot = await firestore
+    .collection(COLLECTIONS.attachments)
+    .where('event_id', '==', eventId)
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const batch = firestore.batch();
+  snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+
+  return snapshot.docs.length;
 }

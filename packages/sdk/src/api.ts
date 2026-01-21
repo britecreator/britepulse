@@ -3,7 +3,14 @@
  * Handles communication with BritePulse API
  */
 
-import type { BritePulseConfig, EventPayload, FeedbackData, ErrorData, ContextData } from './types.js';
+import type { BritePulseConfig, EventPayload, FeedbackData, ErrorData, ContextData, AttachmentData } from './types.js';
+
+/**
+ * Event with attachments (extended for feedback)
+ */
+interface EventWithAttachments extends EventPayload {
+  attachments?: AttachmentData[];
+}
 
 const DEFAULT_API_URL = 'https://britepulse-api-29820647719.us-central1.run.app';
 
@@ -31,7 +38,7 @@ export function createApiClient(config: BritePulseConfig) {
   /**
    * Send events to the API
    */
-  async function sendEvents(events: EventPayload[]): Promise<boolean> {
+  async function sendEvents(events: (EventPayload | EventWithAttachments)[]): Promise<boolean> {
     try {
       const response = await fetch(`${apiUrl}/events`, {
         method: 'POST',
@@ -73,8 +80,8 @@ export function createApiClient(config: BritePulseConfig) {
   /**
    * Create event payload from feedback data
    */
-  function createFeedbackEvent(feedback: FeedbackData, context: ContextData): EventPayload {
-    return {
+  function createFeedbackEvent(feedback: FeedbackData, context: ContextData): EventWithAttachments {
+    const event: EventWithAttachments = {
       event_type: 'feedback',
       session_id: context.sessionId,
       trace_id: context.traceId,
@@ -88,6 +95,13 @@ export function createApiClient(config: BritePulseConfig) {
         allow_contact: feedback.allowContact,
       },
     };
+
+    // Add attachments if present
+    if (feedback.attachments && feedback.attachments.length > 0) {
+      event.attachments = feedback.attachments;
+    }
+
+    return event;
   }
 
   /**

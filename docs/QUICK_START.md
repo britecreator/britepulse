@@ -133,6 +133,54 @@ BritePulse.openWidget();
 
 ---
 
+## Attaching Images
+
+Users can attach images (screenshots, error states, etc.) when submitting feedback to provide visual context.
+
+### Using the Widget
+1. Click the **Feedback** button
+2. Fill in your feedback description
+3. Click the **📎 Attach Image** button
+4. Select an image file (JPEG, PNG, GIF, or WebP, max 5MB)
+5. A thumbnail preview will appear
+6. Submit your feedback
+
+### Programmatic Attachment
+
+```javascript
+// Convert a file to base64
+async function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+  });
+}
+
+// Submit feedback with an image
+const imageFile = document.getElementById('imageInput').files[0];
+const base64Data = await toBase64(imageFile);
+
+BritePulse.getInstance()?.submitFeedback({
+  category: 'bug',
+  description: 'Button not working on mobile',
+  attachments: [{
+    filename: imageFile.name,
+    content_type: imageFile.type,
+    data: base64Data,
+    user_opted_in: true,  // Required
+  }],
+});
+```
+
+### Supported Formats
+- JPEG, PNG, GIF, WebP
+- Maximum 5MB per file
+- View attachments in the Console under **Issues** → Events tab
+
+---
+
 ## Troubleshooting
 
 ### Widget doesn't appear

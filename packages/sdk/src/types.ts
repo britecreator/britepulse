@@ -31,12 +31,20 @@ export interface BritePulseConfig {
   debug?: boolean;
 }
 
+export interface AttachmentData {
+  filename: string;
+  content_type: string;
+  data: string; // base64
+  user_opted_in: true;
+}
+
 export interface FeedbackData {
   category: 'bug' | 'feature' | 'feedback';
   description: string;
   reproductionSteps?: string;
   allowContact?: boolean;
-  screenshot?: string; // base64
+  screenshot?: string; // base64 (deprecated, use attachments)
+  attachments?: AttachmentData[];
 }
 
 export interface ErrorData {

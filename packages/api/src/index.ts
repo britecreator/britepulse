@@ -23,6 +23,7 @@ import {
   issuesRoutes,
   usersRoutes,
   briefsRoutes,
+  attachmentsRoutes,
 } from './routes/index.js';
 
 // Validate configuration
@@ -90,7 +91,9 @@ app.use(cors(corsOptions));
 app.use('/events', cors({ origin: true }));
 
 // Request parsing
+// Default limit is 1mb, but /events needs 10mb for base64 image attachments
 app.use(express.json({ limit: '1mb' }));
+app.use('/events', express.json({ limit: '10mb' })); // Higher limit for attachments
 app.use(express.urlencoded({ extended: true }));
 
 // Request context (ID, timing)
@@ -138,6 +141,7 @@ app.use('/admin', adminRoutes);
 app.use('/admin/users', usersRoutes);
 app.use('/issues', issuesRoutes);
 app.use('/briefs', briefsRoutes);
+app.use('/attachments', attachmentsRoutes);
 
 // 404 handler
 app.use((_req, res) => {

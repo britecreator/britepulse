@@ -5,6 +5,7 @@ import {
   useIssueEvents,
   useUpdateIssueStatus,
   useUpdateIssueSeverity,
+  getAttachmentRedirectUrl,
 } from '../../hooks/useApi';
 import { useAuth } from '../../contexts/AuthContext';
 import type { IssueStatus, IssueType, Severity } from '../../types';
@@ -19,6 +20,30 @@ function formatDate(dateString: string | undefined | null): string {
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return 'Invalid date';
   return date.toLocaleString();
+}
+
+// Attachment thumbnail component
+function AttachmentThumbnail({ attachmentId }: { attachmentId: string }) {
+  const url = getAttachmentRedirectUrl(attachmentId);
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-block"
+      title="Click to view full image"
+    >
+      <img
+        src={url}
+        alt="Attachment"
+        className="h-16 w-auto rounded border border-gray-200 hover:border-primary-400 transition-colors cursor-pointer"
+        onError={(e) => {
+          // Hide broken images
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+    </a>
+  );
 }
 
 export default function IssueDetailPage() {
@@ -367,6 +392,18 @@ export default function IssueDetailPage() {
                               {event.payload.feedback.sentiment}
                             </span>
                           )}
+                        </div>
+                      )}
+                      {event.attachment_refs && event.attachment_refs.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <p className="text-xs font-medium text-gray-500 mb-2">
+                            Attachments ({event.attachment_refs.length})
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {event.attachment_refs.map((attachmentId) => (
+                              <AttachmentThumbnail key={attachmentId} attachmentId={attachmentId} />
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>

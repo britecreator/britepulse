@@ -145,6 +145,49 @@ window.BritePulse?.captureError(error, {
 window.BritePulse?.openWidget();
 ```
 
+## Image Attachments
+
+The feedback widget supports image attachments for visual context (screenshots, error states, etc.).
+
+### Widget Usage
+- Click the **📎 Attach Image** button in the feedback widget
+- Supported: JPEG, PNG, GIF, WebP (max 5MB)
+- A thumbnail preview shows before submission
+- Attachments appear in the Console under Issues → Events tab
+
+### Programmatic Attachment
+
+```typescript
+// Submit feedback with an image
+async function submitFeedbackWithImage(imageFile: File) {
+  const toBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+    });
+
+  const base64Data = await toBase64(imageFile);
+
+  window.BritePulse?.getInstance()?.submitFeedback({
+    category: 'bug',
+    description: 'Issue with screenshot attached',
+    attachments: [{
+      filename: imageFile.name,
+      content_type: imageFile.type,
+      data: base64Data,
+      user_opted_in: true,  // Required
+    }],
+  });
+}
+```
+
+### Storage Notes
+- Images stored securely in Google Cloud Storage
+- 90-day automatic retention
+- Time-limited signed URLs (15 min) for security
+
 ## Staging Environment
 
 To use staging instead of production, use the staging public key:

@@ -309,3 +309,21 @@ export function useDeleteUser() {
     },
   });
 }
+
+// Attachments
+export function useAttachmentUrl(attachmentId: string | undefined) {
+  return useQuery({
+    queryKey: ['attachments', attachmentId],
+    queryFn: () =>
+      fetchApi<{ data: { url: string; expires_at: string } }>(`/attachments/${attachmentId}`).then(
+        (r) => r.data
+      ),
+    enabled: !!attachmentId,
+    staleTime: 10 * 60 * 1000, // 10 minutes (URLs expire in 15)
+  });
+}
+
+export function getAttachmentRedirectUrl(attachmentId: string): string {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return `${API_BASE}/attachments/${attachmentId}/redirect?token=${encodeURIComponent(token || '')}`;
+}

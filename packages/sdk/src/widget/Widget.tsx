@@ -3,8 +3,8 @@
  * Intercom-style feedback button and modal
  */
 
-import { useState, useCallback } from 'preact/hooks';
-import type { FeedbackData, BritePulseConfig } from '../types.js';
+import { useState, useCallback, useRef } from 'preact/hooks';
+import type { FeedbackData, BritePulseConfig, AttachmentData } from '../types.js';
 import { styles } from './styles.js';
 
 interface WidgetProps {
@@ -13,6 +13,10 @@ interface WidgetProps {
 }
 
 type Category = 'bug' | 'feature' | 'feedback';
+
+// Max file size in bytes (5MB)
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 export function Widget({ config, onSubmit }: WidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -23,20 +27,84 @@ export function Widget({ config, onSubmit }: WidgetProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isButtonHovered, setIsButtonHovered] = useState(false);
+  const [attachment, setAttachment] = useState<{ file: File; preview: string } | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const position = config.widgetPosition || 'bottom-right';
   const buttonText = config.widgetButtonText || 'Feedback';
+
+  const handleFileSelect = useCallback((e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    setAttachmentError(null);
+
+    if (!file) {
+      setAttachment(null);
+      return;
+    }
+
+    // Validate file type
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setAttachmentError('Please select an image file (JPEG, PNG, GIF, or WebP)');
+      input.value = '';
+      return;
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      setAttachmentError('Image must be less than 5MB');
+      input.value = '';
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAttachment({
+        file,
+        preview: reader.result as string,
+      });
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const removeAttachment = useCallback(() => {
+    setAttachment(null);
+    setAttachmentError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!description.trim()) return;
 
     setIsSubmitting(true);
 
+    // Convert attachment to base64 if present
+    let attachments: AttachmentData[] | undefined;
+    if (attachment) {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(attachment.file);
+      });
+
+      attachments = [{
+        filename: attachment.file.name,
+        content_type: attachment.file.type,
+        data: base64,
+        user_opted_in: true,
+      }];
+    }
+
     const feedback: FeedbackData = {
       category,
       description: description.trim(),
       reproductionSteps: steps.trim() || undefined,
       allowContact,
+      attachments,
     };
 
     const success = await onSubmit(feedback);
@@ -53,9 +121,13 @@ export function Widget({ config, onSubmit }: WidgetProps) {
         setSteps('');
         setAllowContact(false);
         setCategory('bug');
+        setAttachment(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }, 2000);
     }
-  }, [category, description, steps, allowContact, onSubmit]);
+  }, [category, description, steps, allowContact, attachment, onSubmit]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
@@ -158,6 +230,44 @@ export function Widget({ config, onSubmit }: WidgetProps) {
                     style={{ ...styles.textarea, minHeight: '60px' }}
                   />
                 )}
+
+                {/* Image Attachment */}
+                <div style={styles.attachmentSection}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
+                  {attachment ? (
+                    <div style={styles.attachmentPreview}>
+                      <img
+                        src={attachment.preview}
+                        alt="Attachment preview"
+                        style={styles.attachmentImage}
+                      />
+                      <button
+                        onClick={removeAttachment}
+                        style={styles.attachmentRemove}
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      style={styles.attachmentButton}
+                      type="button"
+                    >
+                      📎 Attach image
+                    </button>
+                  )}
+                  {attachmentError && (
+                    <p style={styles.attachmentError}>{attachmentError}</p>
+                  )}
+                </div>
 
                 {/* Allow Contact */}
                 <label style={styles.checkbox}>

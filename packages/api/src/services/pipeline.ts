@@ -3,10 +3,12 @@
  * Orchestrates event ingestion, redaction, fingerprinting, and issue grouping
  */
 
-import type { Event, Issue, IssueInput, EventType, RedactionProfile } from '@britepulse/shared';
+import type { Event, Issue, IssueInput, EventType, RedactionProfile, Attachment, Environment } from '@britepulse/shared';
+import { v4 as uuidv4 } from 'uuid';
 import { redactObject } from './redaction.js';
 import { generateFingerprint, extractFingerprintInput } from './fingerprint.js';
 import * as firestoreService from './firestore.js';
+import * as storageService from './storage.js';
 import { config } from '../config.js';
 
 // Lazy load AI triage to avoid startup issues if not configured
@@ -35,6 +37,16 @@ async function initAITriage(): Promise<typeof import('@britepulse/ai-triage') | 
 }
 
 /**
+ * Attachment upload input (from SDK)
+ */
+export interface AttachmentUploadInput {
+  filename: string;
+  content_type: string;
+  data: string; // base64
+  user_opted_in: true;
+}
+
+/**
  * Pipeline processing result
  */
 export interface PipelineResult {
@@ -43,6 +55,7 @@ export interface PipelineResult {
   isNewIssue: boolean;
   redactionsApplied: number;
   fingerprint: string | null;
+  attachmentIds: string[];
 }
 
 /**
@@ -51,10 +64,12 @@ export interface PipelineResult {
  * 2. Generate fingerprint (for errors)
  * 3. Find or create issue
  * 4. Store event and update issue
+ * 5. Process attachments (if any)
  */
 export async function processEvent(
   eventData: Omit<Event, 'event_id' | 'fingerprint'>,
-  redactionProfile: RedactionProfile = 'standard'
+  redactionProfile: RedactionProfile = 'standard',
+  attachments?: AttachmentUploadInput[]
 ): Promise<PipelineResult> {
   // Step 1: Apply redaction to payload
   const { data: redactedPayload, redactionsApplied } = redactObject(
@@ -113,7 +128,61 @@ export async function processEvent(
     isNewIssue = true;
   }
 
-  // Step 5: Check for AI triage eligibility (async, non-blocking)
+  // Step 5: Process attachments if any
+  const attachmentIds: string[] = [];
+  if (attachments && attachments.length > 0 && storageService.isStorageConfigured()) {
+    for (const attachment of attachments) {
+      try {
+        const attachmentId = uuidv4();
+        const storagePath = storageService.generateStoragePath(
+          event.app_id,
+          event.event_id,
+          attachmentId,
+          attachment.filename
+        );
+
+        // Upload to GCS
+        await storageService.uploadAttachment(
+          storagePath,
+          attachment.data,
+          attachment.content_type
+        );
+
+        // Calculate file size from base64
+        const data = attachment.data.replace(/^data:[^;]+;base64,/, '');
+        const sizeBytes = Math.floor((data.length * 3) / 4);
+
+        // Create attachment record
+        const attachmentRecord: Attachment = {
+          attachment_id: attachmentId,
+          event_id: event.event_id,
+          app_id: event.app_id,
+          environment: event.environment as Environment,
+          filename: attachment.filename,
+          content_type: attachment.content_type,
+          size_bytes: sizeBytes,
+          storage_path: storagePath,
+          uploaded_at: new Date().toISOString(),
+          expires_at: storageService.calculateExpiresAt(),
+          user_opted_in: attachment.user_opted_in,
+        };
+
+        await firestoreService.createAttachment(attachmentRecord);
+        attachmentIds.push(attachmentId);
+      } catch (error) {
+        console.error('[Pipeline] Failed to process attachment:', error);
+        // Continue processing other attachments
+      }
+    }
+
+    // Update event with attachment refs if any were successfully processed
+    if (attachmentIds.length > 0) {
+      await firestoreService.updateEvent(event.event_id, { attachment_refs: attachmentIds });
+      event.attachment_refs = attachmentIds;
+    }
+  }
+
+  // Step 6: Check for AI triage eligibility (async, non-blocking)
   maybeRunAITriage(issue, event).catch((error) => {
     console.error('[Pipeline] AI triage error:', error);
   });
@@ -124,6 +193,7 @@ export async function processEvent(
     isNewIssue,
     redactionsApplied,
     fingerprint,
+    attachmentIds,
   };
 }
 

@@ -10,7 +10,7 @@ import { schemas, type Event } from '@britepulse/shared';
 import { config } from '../config.js';
 import { asyncHandler, APIError, apiKeyAuth } from '../middleware/index.js';
 import * as firestoreService from '../services/firestore.js';
-import { processEvent } from '../services/pipeline.js';
+import { processEvent, type AttachmentUploadInput } from '../services/pipeline.js';
 
 const router: IRouter = Router();
 
@@ -85,8 +85,11 @@ router.post(
           event.trace_id = eventInput.trace_id;
         }
 
-        // Process through pipeline (redaction, fingerprinting, issue grouping)
-        const result = await processEvent(event);
+        // Extract attachments if present
+        const attachments = eventInput.attachments as AttachmentUploadInput[] | undefined;
+
+        // Process through pipeline (redaction, fingerprinting, issue grouping, attachments)
+        const result = await processEvent(event, 'standard', attachments);
         accepted.push(result.event.event_id);
       } catch (error) {
         rejected.push({

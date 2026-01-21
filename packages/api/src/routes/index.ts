@@ -9,3 +9,4 @@ export { default as adminRoutes } from './admin.js';
 export { default as issuesRoutes } from './issues.js';
 export { default as usersRoutes } from './users.js';
 export { default as briefsRoutes } from './briefs.js';
+export { default as attachmentsRoutes } from './attachments.js';

@@ -36,6 +36,12 @@ export const config = {
   // Console URL (for links in emails)
   consoleBaseUrl: process.env.CONSOLE_BASE_URL || 'http://localhost:3000',
 
+  // Google Cloud Storage (for attachments)
+  gcsBucket: process.env.GCS_BUCKET || '',
+  attachmentMaxSizeMb: parseInt(process.env.ATTACHMENT_MAX_SIZE_MB || '5', 10),
+  attachmentRetentionDays: parseInt(process.env.ATTACHMENT_RETENTION_DAYS || '90', 10),
+  attachmentSignedUrlExpiryMinutes: parseInt(process.env.ATTACHMENT_SIGNED_URL_EXPIRY_MINUTES || '15', 10),
+
   // CORS allowed origins for SDK ingestion (comma-separated)
   // In production, this should include customer app domains
   corsAllowedOrigins: (process.env.CORS_ALLOWED_ORIGINS || '')
