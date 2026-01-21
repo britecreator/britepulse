@@ -119,6 +119,16 @@ export function generateContextFile(data: ContextFileData): string {
     });
   }
 
+  // Attachments (if any)
+  const eventsWithAttachments = events.filter((e) => e.attachment_refs && e.attachment_refs.length > 0);
+  if (eventsWithAttachments.length > 0) {
+    lines.push('## Attachments');
+    lines.push(`This issue includes ${eventsWithAttachments.length} event(s) with image attachments.`);
+    lines.push('Screenshots or images were provided by users to help illustrate the issue.');
+    lines.push('View attachments in the BritePulse console under the Events tab.');
+    lines.push('');
+  }
+
   // Recent Events (only show if there are error events)
   const errorEvents = events.filter(
     (e) => e.event_type === 'frontend_error' || e.event_type === 'backend_error'
@@ -392,6 +402,15 @@ export function generateContextJSON(data: ContextFileData): object {
 
   // Include instruction type hint
   result.instruction_type = isFeedbackIssue(issue) ? 'feature_request' : 'bug_fix';
+
+  // Include attachment count if any events have attachments
+  const eventsWithAttachments = events.filter((e) => e.attachment_refs && e.attachment_refs.length > 0);
+  if (eventsWithAttachments.length > 0) {
+    result.attachments = {
+      events_with_attachments: eventsWithAttachments.length,
+      note: 'Image attachments are available in the BritePulse console under the Events tab',
+    };
+  }
 
   return result;
 }
