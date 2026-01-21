@@ -37,7 +37,6 @@ export interface SendResult {
  * Generate HTML email for issue resolved notification
  */
 function generateResolvedEmailHtml(issue: Issue, app: App): string {
-  const issueUrl = `${config.consoleBaseUrl}/issues/${issue.issue_id}`;
   const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
                          issue.issue_type === 'feedback' ? 'Feedback' :
                          issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';

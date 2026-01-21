@@ -17,6 +17,7 @@
     "@britepulse/ai-triage": "workspace:*",
     "@britepulse/daily-brief": "workspace:*",
     "@britepulse/shared": "workspace:*",
+    "@sendgrid/mail": "^8.1.4",
     "@google-cloud/bigquery": "^7.5.0",
     "@google-cloud/firestore": "^7.6.0",
     "@google-cloud/storage": "^7.14.0",
