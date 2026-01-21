@@ -328,11 +328,20 @@ export async function updateIssue(
   if (!doc.exists) return null;
 
   const { reason, ...updateFields } = updates;
+  const now = new Date().toISOString();
 
-  await docRef.update({
+  // Build the update object
+  const updateData: Record<string, unknown> = {
     ...updateFields,
-    'timestamps.last_seen_at': new Date().toISOString(),
-  });
+    'timestamps.last_seen_at': now,
+  };
+
+  // Set resolved_at when status changes to resolved
+  if (updates.status === 'resolved') {
+    updateData['timestamps.resolved_at'] = now;
+  }
+
+  await docRef.update(updateData);
 
   const updated = await docRef.get();
   return updated.data() as Issue;
