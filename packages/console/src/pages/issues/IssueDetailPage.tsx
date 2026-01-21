@@ -5,7 +5,7 @@ import {
   useIssueEvents,
   useUpdateIssueStatus,
   useUpdateIssueSeverity,
-  getAttachmentRedirectUrl,
+  useAttachmentUrl,
 } from '../../hooks/useApi';
 import { useAuth } from '../../contexts/AuthContext';
 import type { IssueStatus, IssueType, Severity } from '../../types';
@@ -24,17 +24,32 @@ function formatDate(dateString: string | undefined | null): string {
 
 // Attachment thumbnail component
 function AttachmentThumbnail({ attachmentId }: { attachmentId: string }) {
-  const url = getAttachmentRedirectUrl(attachmentId);
+  const { data, isLoading, error } = useAttachmentUrl(attachmentId);
+
+  if (isLoading) {
+    return (
+      <div className="h-16 w-16 rounded border border-gray-200 bg-gray-100 animate-pulse" />
+    );
+  }
+
+  if (error || !data?.url) {
+    return (
+      <div className="h-16 w-16 rounded border border-gray-200 bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+        Error
+      </div>
+    );
+  }
+
   return (
     <a
-      href={url}
+      href={data.url}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-block"
       title="Click to view full image"
     >
       <img
-        src={url}
+        src={data.url}
         alt="Attachment"
         className="h-16 w-auto rounded border border-gray-200 hover:border-primary-400 transition-colors cursor-pointer"
         onError={(e) => {
