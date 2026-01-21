@@ -53,7 +53,7 @@ steps:
       - '--all-tags'
       - '${_ARTIFACT_REPO}/console'
 
-  # Deploy API to Cloud Run (preserves existing env vars)
+  # Deploy API to Cloud Run (with explicit env vars)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-api'
     waitFor: ['push-api']
@@ -69,6 +69,8 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      - '--update-env-vars'
+      - 'GCS_BUCKET=britepulse-attachments-britecreations'
 
   # Deploy Console to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
