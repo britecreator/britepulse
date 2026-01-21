@@ -83,6 +83,7 @@ jobs:
             --set-env-vars "SENDGRID_FROM_EMAIL=marketing@brite.co" \
             --set-env-vars "CORS_ORIGIN=https://britepulse-console-29820647719.us-central1.run.app" \
             --set-env-vars "OAUTH_REDIRECT_URI=https://britepulse-api-29820647719.us-central1.run.app/auth/callback" \
+            --set-env-vars "GCS_BUCKET=britepulse-attachments-britecreations" \
             --set-secrets "GOOGLE_CLIENT_ID=britepulse-google-client-id:latest" \
             --set-secrets "GOOGLE_CLIENT_SECRET=britepulse-google-client-secret:latest" \
             --set-secrets "SESSION_SECRET=SESSION_SECRET:latest" \
