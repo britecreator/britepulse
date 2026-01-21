@@ -257,19 +257,41 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 \`\`\`
 
+## User Identification (Important!)
+
+To see who submitted feedback in BritePulse, you must tell the SDK about the logged-in user. Without this, feedback will show as "anonymous".
+
+\`\`\`typescript
+// Call this after your user logs in (e.g., in your auth callback or useEffect)
+window.BritePulse?.getInstance()?.setUser({
+  id: user.id,           // Required: unique user identifier
+  email: user.email,     // Recommended: shows in "Reported By" column
+  role: user.role,       // Optional: e.g., "admin", "user", "guest"
+});
+
+// Call this when user logs out
+window.BritePulse?.getInstance()?.setUser(undefined);
+\`\`\`
+
+**Example with Firebase Auth:**
+\`\`\`typescript
+import { onAuthStateChanged } from 'firebase/auth';
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    window.BritePulse?.getInstance()?.setUser({
+      id: user.uid,
+      email: user.email || undefined,
+    });
+  } else {
+    window.BritePulse?.getInstance()?.setUser(undefined);
+  }
+});
+\`\`\`
+
 ## API Methods
 
 \`\`\`typescript
-// Set user context after login
-window.BritePulse?.getInstance()?.setUser({
-  id: user.id,
-  email: user.email,
-  role: user.role,  // optional
-});
-
-// Clear user on logout
-window.BritePulse?.getInstance()?.setUser(undefined);
-
 // Manual error capture with metadata
 window.BritePulse?.captureError(error, {
   context: 'checkout',
