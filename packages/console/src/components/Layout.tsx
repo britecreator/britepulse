@@ -5,8 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Issues', href: '/issues', icon: ExclamationIcon },
-  { name: 'Apps', href: '/admin/apps', icon: CubeIcon, adminOnly: true },
-  { name: 'Users', href: '/admin/users', icon: UsersIcon, adminOnly: true },
+  { name: 'Apps', href: '/admin/apps', icon: CubeIcon, roles: ['Admin', 'PO'] },
+  { name: 'Users', href: '/admin/users', icon: UsersIcon, roles: ['Admin'] },
 ];
 
 function HomeIcon({ className }: { className?: string }) {
@@ -62,7 +62,7 @@ export default function Layout() {
   const { user, logout, hasRole } = useAuth();
 
   const filteredNavigation = navigation.filter(
-    (item) => !item.adminOnly || hasRole('Admin')
+    (item) => !item.roles || item.roles.some((role) => hasRole(role as 'Admin' | 'PO' | 'Engineer' | 'ReadOnly'))
   );
 
   return (
