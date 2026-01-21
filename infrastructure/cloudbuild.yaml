@@ -1,6 +1,6 @@
 # Cloud Build configuration for BritePulse
 # Builds and deploys API and Console to Cloud Run
-# Triggered automatically on push to main branch
+# Triggered automatically on push to master branch
 
 substitutions:
   _REGION: us-central1
