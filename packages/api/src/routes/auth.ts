@@ -61,16 +61,14 @@ router.get(
         throw APIError.forbidden(`Only ${config.allowedDomain} users are allowed`);
       }
 
-      // Get or create user
-      let user = await firestoreService.getUserByEmail(payload.email!);
+      // Get user - must be pre-created by an admin
+      const user = await firestoreService.getUserByEmail(payload.email!);
       if (!user) {
-        // Create new user with default role
-        user = await firestoreService.createUser({
-          email: payload.email!,
-          name: payload.name,
-          role: 'ReadOnly', // Default role for new users
-          app_access: [],
-        });
+        // User not found - redirect to console with error
+        const errorUrl = new URL('/login', config.consoleBaseUrl);
+        errorUrl.searchParams.set('error', 'access_denied');
+        errorUrl.searchParams.set('message', 'Your account has not been granted access. Please contact an administrator.');
+        return res.redirect(errorUrl.toString());
       }
 
       // Update last login

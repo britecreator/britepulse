@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useUsers, useCreateUser, useDeleteUser, useApps } from '../../hooks/useApi';
+import { useUsers, useCreateUser, useDeleteUser, useApps, useUpdateUser } from '../../hooks/useApi';
 import { useAuth } from '../../contexts/AuthContext';
+import type { User } from '../../types';
 
 type UserRole = 'Admin' | 'PO' | 'Engineer' | 'ReadOnly';
 const ROLES: UserRole[] = ['Admin', 'PO', 'Engineer', 'ReadOnly'];
@@ -20,12 +21,55 @@ export default function UsersPage() {
   const deleteUser = useDeleteUser();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [newUser, setNewUser] = useState({
     email: '',
     name: '',
     role: 'ReadOnly' as UserRole,
     app_access: [] as string[],
   });
+  const [editUserData, setEditUserData] = useState({
+    role: 'ReadOnly' as UserRole,
+    app_access: [] as string[],
+  });
+
+  // Get update mutation - we need to call the hook at the top level
+  // but pass the user ID when mutating
+  const updateUserMutation = useUpdateUser(editingUser?.user_id || '');
+
+  function handleEditUser(user: User) {
+    setEditingUser(user);
+    setEditUserData({
+      role: user.role as UserRole,
+      app_access: user.app_access || [],
+    });
+  }
+
+  function handleUpdateUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    updateUserMutation.mutate(
+      {
+        role: editUserData.role,
+        app_access: editUserData.app_access,
+      },
+      {
+        onSuccess: () => {
+          setEditingUser(null);
+        },
+      }
+    );
+  }
+
+  function toggleEditAppAccess(appId: string) {
+    setEditUserData((prev) => ({
+      ...prev,
+      app_access: prev.app_access.includes(appId)
+        ? prev.app_access.filter((id) => id !== appId)
+        : [...prev.app_access, appId],
+    }));
+  }
 
   function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
@@ -162,14 +206,22 @@ export default function UsersPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                     {user.user_id !== currentUser?.user_id && (
-                      <button
-                        onClick={() => handleDeleteUser(user.user_id, user.email)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleEditUser(user)}
+                          className="text-primary-600 hover:text-primary-900"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.user_id, user.email)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>
@@ -273,6 +325,105 @@ export default function UsersPage() {
                 {createUser.isError && (
                   <p className="mt-2 text-sm text-red-600">
                     Error: {(createUser.error as Error).message}
+                  </p>
+                )}
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              onClick={() => setEditingUser(null)}
+            />
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <form onSubmit={handleUpdateUser}>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Edit User</h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="label">Email</label>
+                    <input
+                      type="email"
+                      disabled
+                      className="input mt-1 bg-gray-100"
+                      value={editingUser.email}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Name</label>
+                    <input
+                      type="text"
+                      disabled
+                      className="input mt-1 bg-gray-100"
+                      value={editingUser.name || ''}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Role</label>
+                    <select
+                      className="input mt-1"
+                      value={editUserData.role}
+                      onChange={(e) => setEditUserData((p) => ({ ...p, role: e.target.value as UserRole }))}
+                    >
+                      {ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Admin: Full access. PO: Can manage issues. Engineer: Can view/update issues. ReadOnly: View only.
+                    </p>
+                  </div>
+
+                  {editUserData.role !== 'Admin' && apps && apps.length > 0 && (
+                    <div>
+                      <label className="label">App Access</label>
+                      <div className="mt-2 space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
+                        {apps.map((app) => (
+                          <label key={app.app_id} className="flex items-center">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                              checked={editUserData.app_access.includes(app.app_id)}
+                              onChange={() => toggleEditAppAccess(app.app_id)}
+                            />
+                            <span className="ml-2 text-sm text-gray-700">{app.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-5 sm:mt-6 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="flex-1 btn-ghost"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateUserMutation.isPending}
+                    className="flex-1 btn-primary disabled:opacity-50"
+                  >
+                    {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+
+                {updateUserMutation.isError && (
+                  <p className="mt-2 text-sm text-red-600">
+                    Error: {(updateUserMutation.error as Error).message}
                   </p>
                 )}
               </form>
