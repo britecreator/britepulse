@@ -18,6 +18,7 @@ import {
 } from '../middleware/index.js';
 import * as firestoreService from '../services/firestore.js';
 import { generateContextFile, generateContextJSON } from '../services/context-generator.js';
+import { sendResolvedNotification } from '../services/email.js';
 import { config } from '../config.js';
 
 const router: IRouter = Router();
@@ -148,6 +149,17 @@ router.post(
       new_value: status,
       reason,
     });
+
+    // Send email notification when issue is resolved and we have reporter email
+    if (status === 'resolved' && updatedIssue?.reported_by?.email) {
+      const app = await firestoreService.getApp(issue.app_id);
+      if (app) {
+        // Send async - don't block the response
+        sendResolvedNotification(updatedIssue, app).catch((err) => {
+          console.error('[Issues] Failed to send resolved notification:', err);
+        });
+      }
+    }
 
     res.json({ data: updatedIssue });
   })
