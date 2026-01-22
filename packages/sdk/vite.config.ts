@@ -10,8 +10,13 @@ export default defineConfig({
       formats: ['es', 'umd'],
     },
     rollupOptions: {
-      // No external dependencies - bundle everything
-      external: [],
+      // React is external - users bring their own
+      external: ['react'],
+      output: {
+        globals: {
+          react: 'React',
+        },
+      },
     },
     minify: 'esbuild',
     sourcemap: true,

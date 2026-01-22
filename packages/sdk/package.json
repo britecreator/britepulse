@@ -25,8 +25,17 @@
   "dependencies": {
     "preact": "^10.20.0"
   },
+  "peerDependencies": {
+    "react": "^17.0.0 || ^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^20.12.7",
+    "@types/react": "^18.2.0",
     "typescript": "^5.4.5",
     "vite": "^5.2.8"
   }

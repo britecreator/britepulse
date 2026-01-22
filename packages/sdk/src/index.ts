@@ -140,6 +140,10 @@ export function getInstance(): BritePulse | null {
 // Export types
 export type { BritePulseConfig, FeedbackData, ErrorData } from './types.js';
 
+// Export React components
+export { BritePulseErrorBoundary } from './ErrorBoundary.js';
+export type { ErrorBoundaryProps } from './ErrorBoundary.js';
+
 // Auto-init from script tag data attributes
 if (typeof document !== 'undefined') {
   const script = document.currentScript as HTMLScriptElement | null;
