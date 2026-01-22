@@ -153,9 +153,9 @@ export function getInstance(): BritePulse | null {
 // Export types
 export type { BritePulseConfig, FeedbackData, ErrorData } from './types.js';
 
-// Export React components
-export { BritePulseErrorBoundary } from './ErrorBoundary.js';
-export type { ErrorBoundaryProps } from './ErrorBoundary.js';
+// Note: BritePulseErrorBoundary is available via separate import:
+// import { BritePulseErrorBoundary } from '@britepulse/sdk/ErrorBoundary'
+// This keeps React out of the main bundle for UMD/script-tag users
 
 // Auto-init from script tag data attributes
 if (typeof document !== 'undefined') {
