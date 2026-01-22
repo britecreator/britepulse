@@ -225,37 +225,45 @@ function App() {
 
 ## Error Boundary (React)
 
-Capture React component errors:
+Wrap your app with the built-in ErrorBoundary to capture React component errors:
 
 \`\`\`tsx
-import { Component, ErrorInfo, ReactNode } from 'react';
+import { BritePulseErrorBoundary } from '@britepulse/sdk';
 
-interface Props { children: ReactNode; fallback?: ReactNode; }
-interface State { hasError: boolean; }
-
-export class ErrorBoundary extends Component<Props, State> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Use captureComponentError for React errors (includes component stack)
-    window.BritePulse?.getInstance()?.captureComponentError(
-      error,
-      errorInfo.componentStack || ''
-    );
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback || <div>Something went wrong</div>;
-    }
-    return this.props.children;
-  }
+// Basic usage - wrap your app or components
+function App() {
+  return (
+    <BritePulseErrorBoundary>
+      <YourApp />
+    </BritePulseErrorBoundary>
+  );
 }
+
+// With custom fallback UI
+<BritePulseErrorBoundary
+  fallback={<div>Something went wrong. Please refresh.</div>}
+>
+  <YourComponent />
+</BritePulseErrorBoundary>
+
+// With reset capability (let users retry)
+<BritePulseErrorBoundary
+  fallback={(error, resetError) => (
+    <div>
+      <p>Error: {error.message}</p>
+      <button onClick={resetError}>Try Again</button>
+    </div>
+  )}
+>
+  <YourComponent />
+</BritePulseErrorBoundary>
 \`\`\`
+
+Props:
+- \`children\`: Components to wrap
+- \`fallback\`: ReactNode or function \`(error, resetError) => ReactNode\`
+- \`onError\`: Optional callback when error occurs
+- \`reportError\`: Whether to send to BritePulse (default: true)
 
 ## User Identification (Important!)
 
