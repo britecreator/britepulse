@@ -104,11 +104,49 @@ export function clearTraceId(): void {
 }
 
 /**
- * Get current route (URL path)
+ * Sensitive query parameter names that should be redacted
+ * Case-insensitive matching is used
+ */
+const SENSITIVE_PARAMS = [
+  'token', 'access_token', 'id_token', 'refresh_token', 'bearer',
+  'api_key', 'apikey', 'key',
+  'password', 'pwd', 'pass', 'passwd',
+  'secret',
+  'code', // OAuth authorization code
+  'session', 'sessionid', 'session_id',
+  'auth', 'authorization',
+  'credential', 'credentials',
+  'private', 'private_key',
+];
+
+/**
+ * Get current route (URL path) with sensitive query params redacted
  */
 export function getCurrentRoute(): string {
   if (typeof window === 'undefined') return '';
-  return window.location.pathname + window.location.search;
+
+  const pathname = window.location.pathname;
+  const search = window.location.search;
+
+  if (!search) return pathname;
+
+  // Redact sensitive query parameters
+  try {
+    const params = new URLSearchParams(search);
+    const sensitiveSet = new Set(SENSITIVE_PARAMS.map((p) => p.toLowerCase()));
+
+    for (const [key] of params) {
+      if (sensitiveSet.has(key.toLowerCase())) {
+        params.set(key, '[REDACTED]');
+      }
+    }
+
+    const redactedSearch = params.toString();
+    return pathname + (redactedSearch ? '?' + redactedSearch : '');
+  } catch {
+    // If parsing fails, return path only (safe fallback)
+    return pathname;
+  }
 }
 
 /**

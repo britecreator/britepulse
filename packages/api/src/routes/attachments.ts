@@ -34,12 +34,18 @@ router.get(
       throw APIError.notFound('Attachment');
     }
 
-    // Check if user has access to the app
+    // Check if user has access
     const user = req.auth?.user;
     if (!user) {
       throw APIError.unauthorized('Authentication required');
     }
 
+    // RBAC: ReadOnly users cannot view attachments (per attachment policy)
+    if (user.role === 'ReadOnly') {
+      throw APIError.forbidden('Attachments are not available for your role');
+    }
+
+    // Check app access
     if (!hasAppAccess(user, attachment.app_id)) {
       throw APIError.forbidden('You do not have access to this attachment');
     }
@@ -98,12 +104,18 @@ router.get(
       throw APIError.notFound('Attachment');
     }
 
-    // Check if user has access to the app
+    // Check if user has access
     const user = req.auth?.user;
     if (!user) {
       throw APIError.unauthorized('Authentication required');
     }
 
+    // RBAC: ReadOnly users cannot view attachments (per attachment policy)
+    if (user.role === 'ReadOnly') {
+      throw APIError.forbidden('Attachments are not available for your role');
+    }
+
+    // Check app access
     if (!hasAppAccess(user, attachment.app_id)) {
       throw APIError.forbidden('You do not have access to this attachment');
     }

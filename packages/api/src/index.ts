@@ -91,9 +91,10 @@ app.use(cors(corsOptions));
 app.use('/events', cors({ origin: true }));
 
 // Request parsing
-// Default limit is 1mb, but /events needs 10mb for base64 image attachments
+// /events needs higher limit for base64 image attachments - must be registered FIRST
+// so that the body is parsed with the higher limit before the global parser runs
+app.use('/events', express.json({ limit: '10mb' }));
 app.use(express.json({ limit: '1mb' }));
-app.use('/events', express.json({ limit: '10mb' })); // Higher limit for attachments
 app.use(express.urlencoded({ extended: true }));
 
 // Request context (ID, timing)
