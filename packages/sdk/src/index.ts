@@ -9,6 +9,7 @@ import {
   collectContext,
   setupTraceInterceptor,
   setupXHRInterceptor,
+  teardownInterceptors,
   setNetworkErrorHandler,
   getSessionId,
   generateTraceId,
@@ -125,6 +126,7 @@ export function init(config: BritePulseConfig): BritePulse {
     },
     destroy: () => {
       teardownErrorCapture();
+      teardownInterceptors();
       setNetworkErrorHandler(null);
       destroyWidget();
       instance = null;

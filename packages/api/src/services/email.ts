@@ -10,6 +10,18 @@ import type { Issue, App } from '@britepulse/shared';
 let isConfigured = false;
 
 /**
+ * Escape HTML special characters to prevent XSS in email templates
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Configure SendGrid with API key
  */
 function ensureConfigured(): boolean {
@@ -41,6 +53,12 @@ function generateResolvedEmailHtml(issue: Issue, app: App): string {
                          issue.issue_type === 'feedback' ? 'Feedback' :
                          issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
 
+  // Escape user-supplied content to prevent HTML injection
+  const safeAppName = escapeHtml(app.name);
+  const safeTitle = escapeHtml(issue.title);
+  const safeDescription = escapeHtml(issue.description.substring(0, 200));
+  const descriptionEllipsis = issue.description.length > 200 ? '...' : '';
+
   return `
 <!DOCTYPE html>
 <html>
@@ -57,20 +75,20 @@ function generateResolvedEmailHtml(issue: Issue, app: App): string {
   <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
     <p style="margin-top: 0;">Hi there,</p>
 
-    <p>Great news! Your ${issueTypeLabel.toLowerCase()} for <strong>${app.name}</strong> has been resolved.</p>
+    <p>Great news! Your ${issueTypeLabel.toLowerCase()} for <strong>${safeAppName}</strong> has been resolved.</p>
 
     <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
       <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;">
         <strong style="color: #374151;">${issueTypeLabel}</strong>
       </p>
-      <h2 style="margin: 0 0 15px 0; font-size: 18px; color: #111827;">${issue.title}</h2>
-      <p style="margin: 0; color: #6b7280; font-size: 14px;">${issue.description.substring(0, 200)}${issue.description.length > 200 ? '...' : ''}</p>
+      <h2 style="margin: 0 0 15px 0; font-size: 18px; color: #111827;">${safeTitle}</h2>
+      <p style="margin: 0; color: #6b7280; font-size: 14px;">${safeDescription}${descriptionEllipsis}</p>
     </div>
 
-    <p>Thank you for taking the time to report this. Your feedback helps us improve ${app.name}!</p>
+    <p>Thank you for taking the time to report this. Your feedback helps us improve ${safeAppName}!</p>
 
     <p style="margin-bottom: 0; color: #6b7280; font-size: 14px;">
-      — The ${app.name} Team
+      — The ${safeAppName} Team
     </p>
   </div>
 

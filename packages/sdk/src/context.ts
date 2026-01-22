@@ -16,6 +16,11 @@ type NetworkErrorHandler = (error: ErrorData) => void;
 let networkErrorHandler: NetworkErrorHandler | null = null;
 let britepulseApiUrl: string | null = null;
 
+// Store original fetch/XHR for cleanup
+let originalFetch: typeof fetch | null = null;
+let originalXHROpen: typeof XMLHttpRequest.prototype.open | null = null;
+let originalXHRSend: typeof XMLHttpRequest.prototype.send | null = null;
+
 /**
  * Set the network error handler (called from SDK init)
  */
@@ -26,11 +31,16 @@ export function setNetworkErrorHandler(handler: NetworkErrorHandler | null, apiU
 
 /**
  * Check if a URL is BritePulse's own API (to avoid infinite loops)
+ * Uses precise matching: URL must start with the configured API URL
  */
 function isBritePulseUrl(url: string): boolean {
   if (!britepulseApiUrl) return false;
   try {
-    return url.includes(britepulseApiUrl) || url.includes('britepulse');
+    // Normalize URLs for comparison
+    const normalizedUrl = url.toLowerCase();
+    const normalizedApiUrl = britepulseApiUrl.toLowerCase();
+    // Check if URL starts with configured API URL (precise match)
+    return normalizedUrl.startsWith(normalizedApiUrl);
   } catch {
     return false;
   }
@@ -175,8 +185,10 @@ export function collectContext(config: BritePulseConfig): ContextData {
  */
 export function setupTraceInterceptor(): void {
   if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
+  if (originalFetch) return; // Already intercepted
 
-  const originalFetch = window.fetch;
+  originalFetch = window.fetch;
+  const savedFetch = originalFetch; // Local reference for closure
 
   window.fetch = function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const traceId = getTraceId() || generateTraceId();
@@ -191,7 +203,7 @@ export function setupTraceInterceptor(): void {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const method = init?.method || 'GET';
 
-    return originalFetch.call(this, input, {
+    return savedFetch.call(this, input, {
       ...init,
       headers,
     }).then((response) => {
@@ -229,9 +241,10 @@ export function setupTraceInterceptor(): void {
  */
 export function setupXHRInterceptor(): void {
   if (typeof window === 'undefined' || typeof XMLHttpRequest === 'undefined') return;
+  if (originalXHROpen) return; // Already intercepted
 
-  const originalOpen = XMLHttpRequest.prototype.open;
-  const originalSend = XMLHttpRequest.prototype.send;
+  originalXHROpen = XMLHttpRequest.prototype.open;
+  originalXHRSend = XMLHttpRequest.prototype.send;
 
   // Extended XHR type with our tracking properties
   interface BritePulseXHR extends XMLHttpRequest {
@@ -250,7 +263,7 @@ export function setupXHRInterceptor(): void {
     const xhr = this as BritePulseXHR;
     xhr._britepulse_url = url.toString();
     xhr._britepulse_method = method;
-    return originalOpen.call(
+    return originalXHROpen!.call(
       this,
       method,
       url,
@@ -312,6 +325,27 @@ export function setupXHRInterceptor(): void {
       });
     }
 
-    return originalSend.call(this, body);
+    return originalXHRSend!.call(this, body);
   };
+}
+
+/**
+ * Restore original fetch and XHR methods (cleanup on SDK destroy)
+ */
+export function teardownInterceptors(): void {
+  // Restore original fetch
+  if (originalFetch && typeof window !== 'undefined') {
+    window.fetch = originalFetch;
+    originalFetch = null;
+  }
+
+  // Restore original XHR methods
+  if (originalXHROpen && typeof XMLHttpRequest !== 'undefined') {
+    XMLHttpRequest.prototype.open = originalXHROpen;
+    originalXHROpen = null;
+  }
+  if (originalXHRSend && typeof XMLHttpRequest !== 'undefined') {
+    XMLHttpRequest.prototype.send = originalXHRSend;
+    originalXHRSend = null;
+  }
 }
