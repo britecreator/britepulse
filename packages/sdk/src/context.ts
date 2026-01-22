@@ -3,13 +3,38 @@
  * Collects session, trace, route, and version information
  */
 
-import type { ContextData, BritePulseConfig } from './types.js';
+import type { ContextData, BritePulseConfig, ErrorData } from './types.js';
 
 const SESSION_KEY = 'britepulse_session_id';
 const TRACE_HEADER = 'x-trace-id';
 
 // Stored user context that can be updated after init
 let currentUser: { id?: string; role?: string; email?: string } | undefined;
+
+// Network error handler - set during SDK init
+type NetworkErrorHandler = (error: ErrorData) => void;
+let networkErrorHandler: NetworkErrorHandler | null = null;
+let britepulseApiUrl: string | null = null;
+
+/**
+ * Set the network error handler (called from SDK init)
+ */
+export function setNetworkErrorHandler(handler: NetworkErrorHandler | null, apiUrl?: string): void {
+  networkErrorHandler = handler;
+  britepulseApiUrl = apiUrl || null;
+}
+
+/**
+ * Check if a URL is BritePulse's own API (to avoid infinite loops)
+ */
+function isBritePulseUrl(url: string): boolean {
+  if (!britepulseApiUrl) return false;
+  try {
+    return url.includes(britepulseApiUrl) || url.includes('britepulse');
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Set/update the current user context
@@ -108,7 +133,7 @@ export function collectContext(config: BritePulseConfig): ContextData {
 }
 
 /**
- * Intercept fetch to add trace ID header
+ * Intercept fetch to add trace ID header and capture errors
  */
 export function setupTraceInterceptor(): void {
   if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
@@ -124,21 +149,57 @@ export function setupTraceInterceptor(): void {
       headers.set(TRACE_HEADER, traceId);
     }
 
+    // Get URL and method for error reporting
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const method = init?.method || 'GET';
+
     return originalFetch.call(this, input, {
       ...init,
       headers,
+    }).then((response) => {
+      // Capture 4xx/5xx errors (but not for BritePulse's own API)
+      if (!response.ok && networkErrorHandler && !isBritePulseUrl(url)) {
+        const errorData: ErrorData = {
+          type: 'NetworkError',
+          message: `HTTP ${response.status}: ${response.statusText || 'Request failed'} - ${method} ${url}`,
+          url,
+          method: method.toUpperCase(),
+          statusCode: response.status,
+          statusText: response.statusText,
+        };
+        networkErrorHandler(errorData);
+      }
+      return response;
+    }).catch((error) => {
+      // Capture network failures (connection errors, CORS, etc.)
+      if (networkErrorHandler && !isBritePulseUrl(url)) {
+        const errorData: ErrorData = {
+          type: 'NetworkError',
+          message: `Fetch failed: ${error.message || 'Network request failed'} - ${method} ${url}`,
+          url,
+          method: method.toUpperCase(),
+        };
+        networkErrorHandler(errorData);
+      }
+      throw error; // Re-throw to preserve original behavior
     });
   };
 }
 
 /**
- * Intercept XMLHttpRequest to add trace ID header
+ * Intercept XMLHttpRequest to add trace ID header and capture errors
  */
 export function setupXHRInterceptor(): void {
   if (typeof window === 'undefined' || typeof XMLHttpRequest === 'undefined') return;
 
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
+
+  // Extended XHR type with our tracking properties
+  interface BritePulseXHR extends XMLHttpRequest {
+    _britepulse_url?: string;
+    _britepulse_method?: string;
+  }
 
   XMLHttpRequest.prototype.open = function (
     method: string,
@@ -148,7 +209,9 @@ export function setupXHRInterceptor(): void {
     password?: string | null
   ): void {
     // Store method and url for later
-    (this as XMLHttpRequest & { _britepulse_url?: string })._britepulse_url = url.toString();
+    const xhr = this as BritePulseXHR;
+    xhr._britepulse_url = url.toString();
+    xhr._britepulse_method = method;
     return originalOpen.call(
       this,
       method,
@@ -160,6 +223,7 @@ export function setupXHRInterceptor(): void {
   };
 
   XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null): void {
+    const xhr = this as BritePulseXHR;
     const traceId = getTraceId() || generateTraceId();
     setTraceId(traceId);
 
@@ -167,6 +231,47 @@ export function setupXHRInterceptor(): void {
       this.setRequestHeader(TRACE_HEADER, traceId);
     } catch {
       // Headers already sent or not allowed
+    }
+
+    // Add error capture listener
+    if (networkErrorHandler && xhr._britepulse_url && !isBritePulseUrl(xhr._britepulse_url)) {
+      const url = xhr._britepulse_url;
+      const method = xhr._britepulse_method || 'GET';
+
+      this.addEventListener('loadend', function () {
+        // Capture 4xx/5xx errors
+        if (this.status >= 400) {
+          const errorData: ErrorData = {
+            type: 'NetworkError',
+            message: `HTTP ${this.status}: ${this.statusText || 'Request failed'} - ${method} ${url}`,
+            url,
+            method: method.toUpperCase(),
+            statusCode: this.status,
+            statusText: this.statusText,
+          };
+          networkErrorHandler!(errorData);
+        }
+      });
+
+      this.addEventListener('error', function () {
+        const errorData: ErrorData = {
+          type: 'NetworkError',
+          message: `XHR failed: Network request failed - ${method} ${url}`,
+          url,
+          method: method.toUpperCase(),
+        };
+        networkErrorHandler!(errorData);
+      });
+
+      this.addEventListener('timeout', function () {
+        const errorData: ErrorData = {
+          type: 'NetworkError',
+          message: `XHR timeout: Request timed out - ${method} ${url}`,
+          url,
+          method: method.toUpperCase(),
+        };
+        networkErrorHandler!(errorData);
+      });
     }
 
     return originalSend.call(this, body);

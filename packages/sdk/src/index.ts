@@ -9,6 +9,7 @@ import {
   collectContext,
   setupTraceInterceptor,
   setupXHRInterceptor,
+  setNetworkErrorHandler,
   getSessionId,
   generateTraceId,
   setTraceId,
@@ -56,6 +57,7 @@ export function init(config: BritePulseConfig): BritePulse {
   // Default config values
   const fullConfig: BritePulseConfig = {
     captureErrors: true,
+    captureNetworkErrors: true,
     enableWidget: true,
     widgetPosition: 'bottom-right',
     debug: false,
@@ -96,6 +98,14 @@ export function init(config: BritePulseConfig): BritePulse {
   // Setup error capture
   setupErrorCapture(fullConfig, handleErrorCapture);
 
+  // Setup network error capture (fetch/XHR 4xx/5xx)
+  if (fullConfig.captureNetworkErrors) {
+    setNetworkErrorHandler(handleErrorCapture, fullConfig.apiUrl);
+    if (fullConfig.debug) {
+      console.log('[BritePulse] Network error capture enabled');
+    }
+  }
+
   // Mount widget
   mountWidget(fullConfig, handleFeedbackSubmit);
 
@@ -115,6 +125,7 @@ export function init(config: BritePulseConfig): BritePulse {
     },
     destroy: () => {
       teardownErrorCapture();
+      setNetworkErrorHandler(null);
       destroyWidget();
       instance = null;
       if (fullConfig.debug) {

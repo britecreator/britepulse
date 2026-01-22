@@ -151,6 +151,7 @@ Add this script tag to your HTML \`<head>\`:
 That's it! The SDK will automatically:
 - Show a feedback button in the bottom-right corner
 - Capture uncaught JavaScript errors
+- Capture network errors (fetch/XHR 4xx/5xx responses)
 - Track user sessions
 
 ## Configuration
@@ -179,6 +180,7 @@ declare global {
         version?: string;
         user?: { id?: string; role?: string; email?: string };
         captureErrors?: boolean;
+        captureNetworkErrors?: boolean; // Auto-capture fetch/XHR 4xx/5xx (default: true)
         enableWidget?: boolean;
         widgetPosition?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
         widgetButtonText?: string;

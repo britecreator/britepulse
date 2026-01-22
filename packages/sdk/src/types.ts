@@ -17,6 +17,8 @@ export interface BritePulseConfig {
   };
   /** Enable/disable error capture */
   captureErrors?: boolean;
+  /** Enable/disable network error capture (4xx/5xx responses) */
+  captureNetworkErrors?: boolean;
   /** Enable/disable the feedback widget */
   enableWidget?: boolean;
   /** Widget position */
@@ -55,6 +57,14 @@ export interface ErrorData {
   sourceFile?: string;
   lineNumber?: number;
   columnNumber?: number;
+  /** For network errors: the request URL */
+  url?: string;
+  /** For network errors: HTTP method (GET, POST, etc.) */
+  method?: string;
+  /** For network errors: HTTP status code */
+  statusCode?: number;
+  /** For network errors: response status text */
+  statusText?: string;
 }
 
 export interface EventPayload {
