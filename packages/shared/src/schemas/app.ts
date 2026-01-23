@@ -91,7 +91,7 @@ export const ScheduleSchema = z.object({
 });
 
 export const AppOwnersSchema = z.object({
-  po_emails: z.array(z.string().email()).min(1),
+  po_emails: z.array(z.string().email()).min(1).max(3),
   engineering_owner_group: z.union([z.string(), z.array(z.string())]).optional(),
 });
 

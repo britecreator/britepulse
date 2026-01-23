@@ -96,6 +96,21 @@ export function useUpdateApp(appId: string) {
   });
 }
 
+export function useUpdateOwners(appId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (owners: { po_emails: string[]; engineering_owner_group?: string | string[] }) =>
+      fetchApi<{ data: App }>(`/admin/apps/${appId}/owners`, {
+        method: 'PATCH',
+        body: JSON.stringify(owners),
+      }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apps'] });
+      queryClient.invalidateQueries({ queryKey: ['apps', appId] });
+    },
+  });
+}
+
 export function useRotateKeys(appId: string) {
   const queryClient = useQueryClient();
   return useMutation({

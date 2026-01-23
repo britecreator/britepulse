@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useApp, useUpdateApp, useRotateKeys, useUpdateAppSchedules, useSendTestBrief } from '../../hooks/useApi';
+import { useApp, useUpdateOwners, useRotateKeys, useUpdateAppSchedules, useSendTestBrief } from '../../hooks/useApi';
 
 type BriefFrequency = 'disabled' | 'daily' | 'only_on_issues' | 'instant';
 
@@ -21,7 +21,7 @@ export default function AppDetailPage() {
   const { appId } = useParams<{ appId: string }>();
   const navigate = useNavigate();
   const { data: app, isLoading, error } = useApp(appId!);
-  const updateApp = useUpdateApp(appId!);
+  const updateOwners = useUpdateOwners(appId!);
   const rotateKeys = useRotateKeys(appId!);
   const updateSchedules = useUpdateAppSchedules(appId!);
   const sendTestBrief = useSendTestBrief(appId!);
@@ -97,21 +97,24 @@ export default function AppDetailPage() {
 
   async function handleAddOwner() {
     if (!newOwner.trim()) return;
+    if (ownerEmails.length >= 3) return;
     const updatedOwners = {
       ...app!.owners,
       po_emails: [...ownerEmails, newOwner.trim()],
     };
-    await updateApp.mutateAsync({ owners: updatedOwners } as any);
+    await updateOwners.mutateAsync(updatedOwners);
     setNewOwner('');
     setEditingOwners(false);
   }
 
   async function handleRemoveOwner(ownerToRemove: string) {
+    const updatedEmails = ownerEmails.filter((o: string) => o !== ownerToRemove);
+    if (updatedEmails.length === 0) return;
     const updatedOwners = {
       ...app!.owners,
-      po_emails: ownerEmails.filter((o: string) => o !== ownerToRemove),
+      po_emails: updatedEmails,
     };
-    await updateApp.mutateAsync({ owners: updatedOwners } as any);
+    await updateOwners.mutateAsync(updatedOwners);
   }
 
   async function handleRotateKeys(environment: string) {
@@ -475,7 +478,9 @@ ${stageKey ? `\`\`\`html
               ))
             )}
           </div>
-          {editingOwners ? (
+          {ownerEmails.length >= 3 ? (
+            <p className="text-sm text-gray-500">Maximum of 3 owners reached</p>
+          ) : editingOwners ? (
             <div className="flex items-center space-x-2">
               <input
                 type="email"
