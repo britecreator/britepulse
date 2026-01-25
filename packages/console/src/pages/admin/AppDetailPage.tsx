@@ -98,11 +98,21 @@ export default function AppDetailPage() {
   async function handleAddOwner() {
     if (!newOwner.trim()) return;
     if (ownerEmails.length >= 3) return;
+    const updatedEmails = [...ownerEmails, newOwner.trim()];
     const updatedOwners = {
       ...app!.owners,
-      po_emails: [...ownerEmails, newOwner.trim()],
+      po_emails: updatedEmails,
     };
     await updateOwners.mutateAsync(updatedOwners);
+
+    // Sync daily brief recipients if schedule exists
+    if (app?.schedules?.daily_brief_time_local) {
+      await updateSchedules.mutateAsync({
+        ...app.schedules,
+        daily_brief_recipients: updatedEmails,
+      });
+    }
+
     setNewOwner('');
     setEditingOwners(false);
   }
@@ -115,6 +125,14 @@ export default function AppDetailPage() {
       po_emails: updatedEmails,
     };
     await updateOwners.mutateAsync(updatedOwners);
+
+    // Sync daily brief recipients if schedule exists
+    if (app?.schedules?.daily_brief_time_local) {
+      await updateSchedules.mutateAsync({
+        ...app.schedules,
+        daily_brief_recipients: updatedEmails,
+      });
+    }
   }
 
   async function handleRotateKeys(environment: string) {
