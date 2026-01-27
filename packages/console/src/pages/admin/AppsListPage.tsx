@@ -84,9 +84,6 @@ export default function AppsListPage() {
                 Owners
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Auto Triage
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Daily Brief
               </th>
               <th className="relative px-6 py-3">
@@ -97,7 +94,7 @@ export default function AppsListPage() {
           <tbody className="bg-white divide-y divide-gray-200">
             {apps?.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                   No applications registered yet. Click "Add Application" to get started.
                 </td>
               </tr>
@@ -124,17 +121,6 @@ export default function AppsListPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {app.owners?.po_emails?.length || 0} owner{(app.owners?.po_emails?.length || 0) !== 1 ? 's' : ''}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        app.policies?.ai_policy
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {app.policies?.ai_policy ? 'Enabled' : 'Disabled'}
-                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
