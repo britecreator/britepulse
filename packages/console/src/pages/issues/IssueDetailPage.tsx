@@ -159,6 +159,9 @@ export default function IssueDetailPage() {
               {issue.app_id} / {issue.environment} | First seen:{' '}
               {formatDate(issue.timestamps.created_at)}
             </div>
+            <div className="mt-1 text-sm text-gray-500">
+              User: {issue.reported_by?.email || issue.reported_by?.user_id || 'Anonymous'}
+            </div>
           </div>
           <button
             onClick={handleDownloadContext}
