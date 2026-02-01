@@ -91,6 +91,7 @@ export interface IssueTimestamps {
   created_at: string;
   last_seen_at: string;
   resolved_at?: string;
+  wont_fix_at?: string;
 }
 
 export interface FixOption {

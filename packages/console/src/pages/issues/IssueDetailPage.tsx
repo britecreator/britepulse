@@ -359,6 +359,31 @@ export default function IssueDetailPage() {
                       </div>
                     </li>
                   )}
+
+                  {/* Won't Fix */}
+                  {issue.timestamps.wont_fix_at && (
+                    <li className="relative pb-8">
+                      <div className="relative flex space-x-3">
+                        <div>
+                          <span className="h-8 w-8 rounded-full bg-red-500 flex items-center justify-center ring-8 ring-white">
+                            <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              Marked as won't fix
+                            </p>
+                          </div>
+                          <div className="mt-1 text-sm text-gray-500">
+                            {formatDate(issue.timestamps.wont_fix_at)}
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  )}
                 </ul>
               </div>
             </div>

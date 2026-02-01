@@ -18,7 +18,7 @@ import {
 } from '../middleware/index.js';
 import * as firestoreService from '../services/firestore.js';
 import { generateContextFile, generateContextJSON } from '../services/context-generator.js';
-import { sendResolvedNotification } from '../services/email.js';
+import { sendResolvedNotification, sendWontFixNotification } from '../services/email.js';
 import { config } from '../config.js';
 
 const router: IRouter = Router();
@@ -157,6 +157,17 @@ router.post(
         // Send async - don't block the response
         sendResolvedNotification(updatedIssue, app).catch((err) => {
           console.error('[Issues] Failed to send resolved notification:', err);
+        });
+      }
+    }
+
+    // Send email notification when issue is marked as won't fix and we have reporter email
+    if (status === 'wont_fix' && updatedIssue?.reported_by?.email) {
+      const app = await firestoreService.getApp(issue.app_id);
+      if (app) {
+        // Send async - don't block the response
+        sendWontFixNotification(updatedIssue, app).catch((err) => {
+          console.error('[Issues] Failed to send wont fix notification:', err);
         });
       }
     }

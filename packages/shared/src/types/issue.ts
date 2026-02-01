@@ -22,6 +22,7 @@ export interface IssueTimestamps {
   created_at: string; // ISO timestamp
   last_seen_at: string; // ISO timestamp
   resolved_at?: string; // ISO timestamp, set when status becomes 'resolved'
+  wont_fix_at?: string; // ISO timestamp, set when status becomes 'wont_fix'
 }
 
 /**

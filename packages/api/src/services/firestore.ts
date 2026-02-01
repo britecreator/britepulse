@@ -341,6 +341,11 @@ export async function updateIssue(
     updateData['timestamps.resolved_at'] = now;
   }
 
+  // Set wont_fix_at when status changes to wont_fix
+  if (updates.status === 'wont_fix') {
+    updateData['timestamps.wont_fix_at'] = now;
+  }
+
   await docRef.update(updateData);
 
   const updated = await docRef.get();

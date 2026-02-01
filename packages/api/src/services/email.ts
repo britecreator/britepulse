@@ -129,6 +129,153 @@ Powered by BritePulse
 }
 
 /**
+ * Generate HTML email for issue won't fix notification
+ */
+function generateWontFixEmailHtml(issue: Issue, app: App): string {
+  const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
+                         issue.issue_type === 'feedback' ? 'Feedback' :
+                         issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
+
+  // Escape user-supplied content to prevent HTML injection
+  const safeAppName = escapeHtml(app.name);
+  const safeTitle = escapeHtml(issue.title);
+  const safeDescription = escapeHtml(issue.description.substring(0, 200));
+  const descriptionEllipsis = issue.description.length > 200 ? '...' : '';
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Update on Your ${issueTypeLabel}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">Update on Your Report</h1>
+  </div>
+
+  <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+    <p style="margin-top: 0;">Hi there,</p>
+
+    <p>Thank you for taking the time to submit your ${issueTypeLabel.toLowerCase()} for <strong>${safeAppName}</strong>. We appreciate your feedback and the effort you put into reporting this.</p>
+
+    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;">
+        <strong style="color: #374151;">${issueTypeLabel}</strong>
+      </p>
+      <h2 style="margin: 0 0 15px 0; font-size: 18px; color: #111827;">${safeTitle}</h2>
+      <p style="margin: 0; color: #6b7280; font-size: 14px;">${safeDescription}${descriptionEllipsis}</p>
+    </div>
+
+    <p>After careful review, we've determined that this issue will not be addressed at this time. This could be due to various factors such as current priorities, technical constraints, or alignment with our product direction.</p>
+
+    <p>We understand this may not be the outcome you were hoping for, and we genuinely value your input. If you have any questions or would like to discuss this further, please don't hesitate to reach out.</p>
+
+    <p style="margin-bottom: 0; color: #6b7280; font-size: 14px;">
+      — The ${safeAppName} Team
+    </p>
+  </div>
+
+  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+    <p style="margin: 0;">Powered by <a href="https://britepulse.io" style="color: #6b7280;">BritePulse</a></p>
+  </div>
+</body>
+</html>
+`;
+}
+
+/**
+ * Generate plain text email for issue won't fix notification
+ */
+function generateWontFixEmailText(issue: Issue, app: App): string {
+  const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
+                         issue.issue_type === 'feedback' ? 'Feedback' :
+                         issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
+
+  return `
+Update on Your Report
+
+Hi there,
+
+Thank you for taking the time to submit your ${issueTypeLabel.toLowerCase()} for ${app.name}. We appreciate your feedback and the effort you put into reporting this.
+
+${issueTypeLabel}: ${issue.title}
+
+${issue.description.substring(0, 300)}${issue.description.length > 300 ? '...' : ''}
+
+After careful review, we've determined that this issue will not be addressed at this time. This could be due to various factors such as current priorities, technical constraints, or alignment with our product direction.
+
+We understand this may not be the outcome you were hoping for, and we genuinely value your input. If you have any questions or would like to discuss this further, please don't hesitate to reach out.
+
+— The ${app.name} Team
+
+---
+Powered by BritePulse
+`.trim();
+}
+
+/**
+ * Send notification email when an issue is marked as won't fix
+ */
+export async function sendWontFixNotification(
+  issue: Issue,
+  app: App
+): Promise<SendResult> {
+  // Check if we have a reporter email
+  if (!issue.reported_by?.email) {
+    return {
+      success: false,
+      error: 'No reporter email available',
+    };
+  }
+
+  if (!ensureConfigured()) {
+    return {
+      success: false,
+      error: 'SendGrid not configured',
+    };
+  }
+
+  const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
+                         issue.issue_type === 'feedback' ? 'Feedback' :
+                         issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
+
+  try {
+    const msg = {
+      to: issue.reported_by.email,
+      from: {
+        email: config.sendgridFromEmail,
+        name: app.name,
+      },
+      subject: `Update on Your ${issueTypeLabel} - ${issue.title}`,
+      text: generateWontFixEmailText(issue, app),
+      html: generateWontFixEmailHtml(issue, app),
+      categories: ['issue-wont-fix', app.app_id],
+      customArgs: {
+        issue_id: issue.issue_id,
+        app_id: app.app_id,
+      },
+    };
+
+    const [response] = await sgMail.send(msg);
+
+    console.log(`[Email] Sent won't fix notification to ${issue.reported_by.email} for issue ${issue.issue_id}`);
+
+    return {
+      success: true,
+      messageId: response.headers['x-message-id']?.toString(),
+    };
+  } catch (error) {
+    console.error('[Email] SendGrid error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
  * Send notification email when an issue is resolved
  */
 export async function sendResolvedNotification(
