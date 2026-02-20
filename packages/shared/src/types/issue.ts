@@ -171,6 +171,7 @@ export interface IssueComment {
   body: string;
   source: 'console' | 'email';
   created_at: string; // ISO timestamp
+  mentions?: string[]; // email addresses @mentioned in body
 }
 
 /**

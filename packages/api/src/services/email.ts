@@ -480,3 +480,142 @@ Powered by BritePulse
     };
   }
 }
+
+/**
+ * Parse @mentions from a comment body.
+ * Matches @user@domain.tld patterns where the leading @ is the mention sigil.
+ * Returns deduplicated array of lowercase email addresses.
+ */
+export function parseMentions(body: string): string[] {
+  const mentionRegex = /(?:^|\s)@([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g;
+  const mentions = new Set<string>();
+  let match: RegExpExecArray | null;
+  while ((match = mentionRegex.exec(body)) !== null) {
+    mentions.add(match[1].toLowerCase());
+  }
+  return Array.from(mentions);
+}
+
+/**
+ * Send notification email to a team member who was @mentioned in a comment.
+ * Unlike sendCommentNotification, this does NOT include a Reply-To header
+ * and instead links to the console.
+ */
+export async function sendTeamMentionNotification(
+  issue: Issue,
+  app: App,
+  comment: IssueComment,
+  recipientEmail: string
+): Promise<SendResult> {
+  if (!ensureConfigured()) {
+    return { success: false, error: 'SendGrid not configured' };
+  }
+
+  const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
+                         issue.issue_type === 'feedback' ? 'Feedback' :
+                         issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
+
+  const safeAppName = escapeHtml(app.name);
+  const safeTitle = escapeHtml(issue.title);
+  const safeBody = escapeHtml(comment.body);
+  const safeAuthor = escapeHtml(comment.author_name || comment.author_email);
+  const consoleUrl = `${config.consoleBaseUrl}/issues/${issue.issue_id}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You were mentioned in a comment</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">You Were Mentioned</h1>
+  </div>
+
+  <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+    <p style="margin-top: 0;">Hi there,</p>
+
+    <p>You were mentioned in a comment on a ${issueTypeLabel.toLowerCase()} for <strong>${safeAppName}</strong>:</p>
+
+    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;">
+        <strong style="color: #374151;">${issueTypeLabel}:</strong> ${safeTitle}
+      </p>
+      <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 12px;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280;">
+          <strong>${safeAuthor}</strong> commented:
+        </p>
+        <p style="margin: 0; color: #111827; font-size: 14px; white-space: pre-wrap;">${safeBody}</p>
+      </div>
+    </div>
+
+    <p><a href="${consoleUrl}" style="color: #2563eb; text-decoration: underline;">View this issue in the BritePulse console</a></p>
+
+    <p style="margin-bottom: 0; color: #6b7280; font-size: 14px;">
+      — The ${safeAppName} Team
+    </p>
+  </div>
+
+  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+    <p style="margin: 0;">Powered by <a href="https://britepulse.io" style="color: #6b7280;">BritePulse</a></p>
+  </div>
+</body>
+</html>
+`;
+
+  const text = `
+You Were Mentioned
+
+Hi there,
+
+You were mentioned in a comment on a ${issueTypeLabel.toLowerCase()} for ${app.name}:
+
+${issueTypeLabel}: ${issue.title}
+
+${comment.author_name || comment.author_email} commented:
+${comment.body}
+
+View this issue in the BritePulse console: ${consoleUrl}
+
+— The ${app.name} Team
+
+---
+Powered by BritePulse
+`.trim();
+
+  try {
+    const msg = {
+      to: recipientEmail,
+      from: {
+        email: config.sendgridFromEmail,
+        name: app.name,
+      },
+      subject: `You were mentioned: ${issue.title}`,
+      text,
+      html,
+      categories: ['issue-mention', app.app_id],
+      customArgs: {
+        issue_id: issue.issue_id,
+        app_id: app.app_id,
+        comment_id: comment.comment_id,
+      },
+    };
+
+    const [response] = await sgMail.send(msg);
+
+    console.log(`[Email] Sent mention notification to ${recipientEmail} for issue ${issue.issue_id}`);
+
+    return {
+      success: true,
+      messageId: response.headers['x-message-id']?.toString(),
+    };
+  } catch (error) {
+    console.error('[Email] SendGrid mention error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}

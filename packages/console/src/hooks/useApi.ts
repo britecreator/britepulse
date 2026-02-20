@@ -294,6 +294,7 @@ interface IssueComment {
   body: string;
   source: 'console' | 'email';
   created_at: string;
+  mentions?: string[];
 }
 
 export function useIssueComments(issueId: string) {

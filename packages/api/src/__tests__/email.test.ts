@@ -19,10 +19,11 @@ vi.mock('../config.js', () => ({
     sendgridApiKey: 'test-api-key',
     sendgridFromEmail: 'test@britepulse.io',
     inboundEmailDomain: 'reply.test.britepulse.io',
+    consoleBaseUrl: 'https://console.test.britepulse.io',
   },
 }));
 
-import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification } from '../services/email.js';
+import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification, parseMentions, sendTeamMentionNotification } from '../services/email.js';
 
 describe('Email Service', () => {
   beforeEach(() => {
@@ -163,6 +164,64 @@ describe('Email Service', () => {
       const msg = mockSend.mock.calls[0][0];
       expect(msg.html).not.toContain('<img src=x');
       expect(msg.html).toContain('&lt;img');
+    });
+  });
+
+  describe('parseMentions', () => {
+    it('should parse a single @mention', () => {
+      expect(parseMentions('@user@test.com hello')).toEqual(['user@test.com']);
+    });
+
+    it('should parse multiple @mentions', () => {
+      const result = parseMentions('@alice@test.com can you check? @bob@test.com please review');
+      expect(result).toEqual(['alice@test.com', 'bob@test.com']);
+    });
+
+    it('should deduplicate mentions', () => {
+      const result = parseMentions('@user@test.com hey @user@test.com again');
+      expect(result).toEqual(['user@test.com']);
+    });
+
+    it('should return empty array when no mentions', () => {
+      expect(parseMentions('no mentions here')).toEqual([]);
+    });
+
+    it('should lowercase mention emails', () => {
+      expect(parseMentions('@User@Test.COM hello')).toEqual(['user@test.com']);
+    });
+
+    it('should handle mention at start of text', () => {
+      expect(parseMentions('@user@test.com hello')).toEqual(['user@test.com']);
+    });
+  });
+
+  describe('sendTeamMentionNotification', () => {
+    it('should send mention notification to specified team member', async () => {
+      const issue = createMockIssue({
+        issue_id: 'issue-abc',
+        reported_by: { user_id: 'u1', email: 'reporter@test.com' },
+      });
+      const app = createMockApp({ name: 'Test App' });
+      const comment = createMockComment({
+        author_email: 'alice@test.com',
+        author_name: 'Alice',
+        body: '@bob@test.com please take a look',
+      });
+
+      const result = await sendTeamMentionNotification(issue, app, comment, 'bob@test.com');
+
+      expect(result.success).toBe(true);
+      expect(mockSend).toHaveBeenCalledTimes(1);
+
+      const msg = mockSend.mock.calls[0][0];
+      expect(msg.to).toBe('bob@test.com');
+      expect(msg.subject).toContain('You were mentioned');
+      expect(msg.html).toContain('You Were Mentioned');
+      expect(msg.html).toContain('please take a look');
+      // Should include console link
+      expect(msg.html).toContain('https://console.test.britepulse.io/issues/issue-abc');
+      // Should NOT have replyTo
+      expect(msg.replyTo).toBeUndefined();
     });
   });
 });

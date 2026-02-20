@@ -15,14 +15,20 @@ vi.mock('../services/firestore.js', () => ({
   getEventsByIssue: vi.fn(),
   createComment: vi.fn(),
   getComments: vi.fn(),
+  getAllUsers: vi.fn().mockResolvedValue([]),
 }));
 
-// Mock email service
-vi.mock('../services/email.js', () => ({
-  sendResolvedNotification: vi.fn().mockResolvedValue({ success: true }),
-  sendWontFixNotification: vi.fn().mockResolvedValue({ success: true }),
-  sendCommentNotification: vi.fn().mockResolvedValue({ success: true }),
-}));
+// Mock email service - parseMentions uses real implementation
+vi.mock('../services/email.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../services/email.js')>();
+  return {
+    ...original,
+    sendResolvedNotification: vi.fn().mockResolvedValue({ success: true }),
+    sendWontFixNotification: vi.fn().mockResolvedValue({ success: true }),
+    sendCommentNotification: vi.fn().mockResolvedValue({ success: true }),
+    sendTeamMentionNotification: vi.fn().mockResolvedValue({ success: true }),
+  };
+});
 
 // Mock context generator
 vi.mock('../services/context-generator.js', () => ({
@@ -344,7 +350,7 @@ describe('Issue Routes', () => {
   });
 
   describe('POST /issues/:issue_id/comments', () => {
-    it('should create a comment and send email notification', async () => {
+    it('should send email to reporter when @mentioned', async () => {
       const issue = createMockIssue({
         issue_id: 'issue-1',
         reported_by: { user_id: 'u1', email: 'reporter@test.com' },
@@ -352,7 +358,7 @@ describe('Issue Routes', () => {
       const newComment = createMockComment({
         issue_id: 'issue-1',
         author_email: 'admin@test.com',
-        body: 'Can you share more details?',
+        body: '@reporter@test.com can you share more details?',
         source: 'console',
       });
 
@@ -362,17 +368,13 @@ describe('Issue Routes', () => {
 
       const res = await request(app)
         .post('/issues/issue-1/comments')
-        .send({ body: 'Can you share more details?' });
+        .send({ body: '@reporter@test.com can you share more details?' });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.body).toBe('Can you share more details?');
 
-      // Verify comment created with correct source and author
+      // Verify comment stored with mentions
       expect(firestoreService.createComment).toHaveBeenCalledWith('issue-1', expect.objectContaining({
-        issue_id: 'issue-1',
-        author_email: 'admin@test.com',
-        body: 'Can you share more details?',
-        source: 'console',
+        mentions: ['reporter@test.com'],
       }));
 
       // Verify email was sent to reporter
@@ -381,6 +383,79 @@ describe('Issue Routes', () => {
         expect.anything(),
         newComment
       );
+    });
+
+    it('should send team mention notification to @mentioned team member', async () => {
+      const issue = createMockIssue({
+        issue_id: 'issue-1',
+        reported_by: { user_id: 'u1', email: 'reporter@test.com' },
+      });
+      const newComment = createMockComment({
+        issue_id: 'issue-1',
+        author_email: 'admin@test.com',
+        body: '@engineer@test.com please review',
+        source: 'console',
+      });
+
+      vi.mocked(firestoreService.getIssue).mockResolvedValue(issue);
+      vi.mocked(firestoreService.createComment).mockResolvedValue(newComment);
+      vi.mocked(firestoreService.getApp).mockResolvedValue(createMockApp());
+      vi.mocked(firestoreService.getAllUsers).mockResolvedValue([
+        { user_id: 'u2', email: 'engineer@test.com', name: 'Engineer', role: 'Engineer', app_access: [], created_at: '', updated_at: '' },
+      ] as any);
+
+      const res = await request(app)
+        .post('/issues/issue-1/comments')
+        .send({ body: '@engineer@test.com please review' });
+
+      expect(res.status).toBe(200);
+      expect(emailService.sendTeamMentionNotification).toHaveBeenCalledWith(
+        issue,
+        expect.anything(),
+        newComment,
+        'engineer@test.com'
+      );
+      // Reporter should NOT be emailed (not mentioned)
+      expect(emailService.sendCommentNotification).not.toHaveBeenCalled();
+    });
+
+    it('should not send any email when no @mentions', async () => {
+      const issue = createMockIssue({
+        issue_id: 'issue-1',
+        reported_by: { user_id: 'u1', email: 'reporter@test.com' },
+      });
+
+      vi.mocked(firestoreService.getIssue).mockResolvedValue(issue);
+      vi.mocked(firestoreService.createComment).mockResolvedValue(createMockComment());
+
+      await request(app)
+        .post('/issues/issue-1/comments')
+        .send({ body: 'Just a note to self' });
+
+      expect(emailService.sendCommentNotification).not.toHaveBeenCalled();
+      expect(emailService.sendTeamMentionNotification).not.toHaveBeenCalled();
+    });
+
+    it('should not send email for self-mention', async () => {
+      const issue = createMockIssue({
+        issue_id: 'issue-1',
+        reported_by: { user_id: 'u1', email: 'reporter@test.com' },
+      });
+
+      vi.mocked(firestoreService.getIssue).mockResolvedValue(issue);
+      vi.mocked(firestoreService.createComment).mockResolvedValue(createMockComment());
+      vi.mocked(firestoreService.getApp).mockResolvedValue(createMockApp());
+      vi.mocked(firestoreService.getAllUsers).mockResolvedValue([
+        { user_id: 'u1', email: 'admin@test.com', name: 'Admin', role: 'Admin', app_access: [], created_at: '', updated_at: '' },
+      ] as any);
+
+      await request(app)
+        .post('/issues/issue-1/comments')
+        .send({ body: '@admin@test.com reminder for myself' });
+
+      // Author is admin@test.com, mention is admin@test.com — should skip
+      expect(emailService.sendCommentNotification).not.toHaveBeenCalled();
+      expect(emailService.sendTeamMentionNotification).not.toHaveBeenCalled();
     });
 
     it('should reject empty comment body', async () => {
@@ -397,22 +472,6 @@ describe('Issue Routes', () => {
         .send({});
 
       expect(res.status).toBe(400);
-    });
-
-    it('should not send email if no reporter email', async () => {
-      const issue = createMockIssue({
-        issue_id: 'issue-1',
-        reported_by: { user_id: 'anonymous' },
-      });
-
-      vi.mocked(firestoreService.getIssue).mockResolvedValue(issue);
-      vi.mocked(firestoreService.createComment).mockResolvedValue(createMockComment());
-
-      await request(app)
-        .post('/issues/issue-1/comments')
-        .send({ body: 'Hello' });
-
-      expect(emailService.sendCommentNotification).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useIssue,
@@ -83,6 +83,13 @@ export default function IssueDetailPage() {
   const [resolutionModal, setResolutionModal] = useState<{ status: IssueStatus } | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
 
+  // @mention state
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasPrefilledRef = useRef(false);
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -102,6 +109,107 @@ export default function IssueDetailPage() {
         </button>
       </div>
     );
+  }
+
+  // @mention candidates: reporter + team members (deduped)
+  const mentionCandidates = useMemo(() => {
+    const candidates: Array<{ email: string; name?: string; isReporter: boolean }> = [];
+    if (issue?.reported_by?.email) {
+      candidates.push({ email: issue.reported_by.email, isReporter: true });
+    }
+    const reporterEmail = issue?.reported_by?.email?.toLowerCase();
+    users?.forEach((u) => {
+      if (u.email.toLowerCase() !== reporterEmail) {
+        candidates.push({ email: u.email, name: u.name, isReporter: false });
+      }
+    });
+    return candidates;
+  }, [issue?.reported_by?.email, users]);
+
+  const filteredMentions = useMemo(() => {
+    if (!mentionQuery) return mentionCandidates;
+    const q = mentionQuery.toLowerCase();
+    return mentionCandidates.filter(
+      (c) => c.email.toLowerCase().includes(q) || (c.name && c.name.toLowerCase().includes(q))
+    );
+  }, [mentionCandidates, mentionQuery]);
+
+  function handleComposeFocus() {
+    if (!hasPrefilledRef.current && issue?.reported_by?.email && commentText === '') {
+      setCommentText(`@${issue.reported_by.email} `);
+      hasPrefilledRef.current = true;
+    }
+  }
+
+  function handleCommentChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const value = e.target.value;
+    setCommentText(value);
+
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const mentionMatch = textBeforeCursor.match(/(^|\s)@([^\s]*)$/);
+
+    if (mentionMatch) {
+      setMentionQuery(mentionMatch[2]);
+      setShowMentionDropdown(true);
+      setMentionIndex(0);
+    } else {
+      setShowMentionDropdown(false);
+      setMentionQuery('');
+    }
+  }
+
+  function handleMentionKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (!showMentionDropdown || filteredMentions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setMentionIndex((i) => Math.min(i + 1, filteredMentions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setMentionIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      insertMention(filteredMentions[mentionIndex]);
+    } else if (e.key === 'Escape') {
+      setShowMentionDropdown(false);
+    }
+  }
+
+  function insertMention(candidate: { email: string }) {
+    if (!textareaRef.current) return;
+
+    const textarea = textareaRef.current;
+    const cursorPos = textarea.selectionStart;
+    const textBeforeCursor = commentText.substring(0, cursorPos);
+    const textAfterCursor = commentText.substring(cursorPos);
+
+    const atPos = textBeforeCursor.lastIndexOf('@');
+    const before = commentText.substring(0, atPos);
+    const newText = `${before}@${candidate.email} ${textAfterCursor}`;
+
+    setCommentText(newText);
+    setShowMentionDropdown(false);
+
+    const newCursorPos = atPos + candidate.email.length + 2;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    });
+  }
+
+  function renderCommentBody(body: string): React.ReactNode {
+    const parts = body.split(/(@[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g);
+    return parts.map((part, i) => {
+      if (part.match(/^@[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
+        return (
+          <span key={i} className="text-primary-600 font-medium">
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
   }
 
   async function handleStatusChange(status: IssueStatus) {
@@ -135,6 +243,7 @@ export default function IssueDetailPage() {
     if (!commentText.trim()) return;
     await addComment.mutateAsync({ body: commentText.trim() });
     setCommentText('');
+    hasPrefilledRef.current = false;
   }
 
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
@@ -584,7 +693,7 @@ export default function IssueDetailPage() {
                           {formatDate(comment.created_at)}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.body}</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{renderCommentBody(comment.body)}</p>
                     </div>
                   ))}
                 </div>
@@ -593,12 +702,47 @@ export default function IssueDetailPage() {
               {/* Compose area */}
               {canEdit && (
                 <div className="border-t pt-4">
-                  <textarea
-                    className="input w-full h-20 resize-none"
-                    placeholder="Add a comment..."
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                  />
+                  <div className="relative">
+                    <textarea
+                      ref={textareaRef}
+                      className="input w-full h-20 resize-none"
+                      placeholder="Add a comment... Use @ to mention someone"
+                      value={commentText}
+                      onChange={handleCommentChange}
+                      onKeyDown={handleMentionKeyDown}
+                      onFocus={handleComposeFocus}
+                    />
+                    {showMentionDropdown && filteredMentions.length > 0 && (
+                      <div className="absolute left-0 right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-10">
+                        {filteredMentions.map((candidate, idx) => (
+                          <button
+                            key={candidate.email}
+                            className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-gray-50 ${
+                              idx === mentionIndex ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                            }`}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              insertMention(candidate);
+                            }}
+                          >
+                            <div>
+                              {candidate.name && (
+                                <span className="font-medium">{candidate.name}</span>
+                              )}
+                              <span className={candidate.name ? 'ml-2 text-gray-500' : ''}>
+                                {candidate.email}
+                              </span>
+                            </div>
+                            {candidate.isReporter && (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                Reporter
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex justify-end mt-2">
                     <button
                       className="btn-primary"

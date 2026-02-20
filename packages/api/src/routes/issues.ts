@@ -18,7 +18,7 @@ import {
 } from '../middleware/index.js';
 import * as firestoreService from '../services/firestore.js';
 import { generateContextFile, generateContextJSON } from '../services/context-generator.js';
-import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification } from '../services/email.js';
+import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification, parseMentions, sendTeamMentionNotification } from '../services/email.js';
 import { config } from '../config.js';
 
 const router: IRouter = Router();
@@ -464,25 +464,45 @@ router.post(
       throw APIError.forbidden('Access to this issue is denied');
     }
 
+    const mentions = parseMentions(body.trim());
+
     const comment = await firestoreService.createComment(issue_id, {
       issue_id,
       author_email: user.email,
       author_name: user.name,
       body: body.trim(),
       source: 'console',
+      ...(mentions.length > 0 && { mentions }),
     });
 
     await logAuditAction(req, 'add_comment', 'issue', issue_id, {
       comment_id: comment.comment_id,
     });
 
-    // Send email notification to reporter if they have an email
-    if (issue.reported_by?.email) {
+    // Send email notifications to @mentioned users
+    if (mentions.length > 0) {
       const app = await firestoreService.getApp(issue.app_id);
       if (app) {
-        sendCommentNotification(issue, app, comment).catch((err) => {
-          console.error('[Issues] Failed to send comment notification:', err);
-        });
+        const allUsers = await firestoreService.getAllUsers();
+        const teamEmails = new Set(allUsers.map((u) => u.email.toLowerCase()));
+        const reporterEmail = issue.reported_by?.email?.toLowerCase();
+        const authorEmail = user.email.toLowerCase();
+
+        for (const email of mentions) {
+          // Skip self-mentions
+          if (email === authorEmail) continue;
+
+          if (email === reporterEmail) {
+            sendCommentNotification(issue, app, comment).catch((err) => {
+              console.error('[Issues] Failed to send comment notification to reporter:', err);
+            });
+          } else if (teamEmails.has(email)) {
+            sendTeamMentionNotification(issue, app, comment, email).catch((err) => {
+              console.error('[Issues] Failed to send mention notification:', err);
+            });
+          }
+          // Unknown emails are silently skipped
+        }
       }
     }
 
