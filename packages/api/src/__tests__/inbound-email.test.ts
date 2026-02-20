@@ -11,6 +11,7 @@ import { createMockIssue, createMockComment, resetIdCounter } from './test-utils
 vi.mock('../services/firestore.js', () => ({
   getIssue: vi.fn(),
   createComment: vi.fn(),
+  getAllUsers: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock config

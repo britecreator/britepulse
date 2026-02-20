@@ -121,9 +121,16 @@ router.post(
         return;
       }
 
-      // Validate sender matches the issue reporter (anti-spoofing)
-      if (issue.reported_by?.email?.toLowerCase() !== senderEmail) {
-        console.warn('[InboundEmail] Sender mismatch:', {
+      // Validate sender is either the issue reporter or a known team member
+      const isReporter = issue.reported_by?.email?.toLowerCase() === senderEmail;
+      let isTeamMember = false;
+      if (!isReporter) {
+        const allUsers = await firestoreService.getAllUsers();
+        isTeamMember = allUsers.some((u) => u.email.toLowerCase() === senderEmail);
+      }
+
+      if (!isReporter && !isTeamMember) {
+        console.warn('[InboundEmail] Sender not authorized:', {
           sender: senderEmail,
           reporter: issue.reported_by?.email,
         });

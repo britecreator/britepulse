@@ -220,8 +220,8 @@ describe('Email Service', () => {
       expect(msg.html).toContain('please take a look');
       // Should include console link
       expect(msg.html).toContain('https://console.test.britepulse.io/issues/issue-abc');
-      // Should NOT have replyTo
-      expect(msg.replyTo).toBeUndefined();
+      // Should have replyTo for email replies
+      expect(msg.replyTo.email).toBe('issue+issue-abc@reply.test.britepulse.io');
     });
   });
 });

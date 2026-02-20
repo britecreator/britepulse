@@ -520,6 +520,7 @@ export async function sendTeamMentionNotification(
   const safeBody = escapeHtml(comment.body);
   const safeAuthor = escapeHtml(comment.author_name || comment.author_email);
   const consoleUrl = `${config.consoleBaseUrl}/issues/${issue.issue_id}`;
+  const replyToAddress = `issue+${issue.issue_id}@${config.inboundEmailDomain || 'reply.britepulse.io'}`;
 
   const html = `
 <!DOCTYPE html>
@@ -551,7 +552,7 @@ export async function sendTeamMentionNotification(
       </div>
     </div>
 
-    <p><a href="${consoleUrl}" style="color: #2563eb; text-decoration: underline;">View this issue in the BritePulse console</a></p>
+    <p>You can reply directly to this email to add a comment, or <a href="${consoleUrl}" style="color: #2563eb; text-decoration: underline;">view this issue in the BritePulse console</a>.</p>
 
     <p style="margin-bottom: 0; color: #6b7280; font-size: 14px;">
       — The ${safeAppName} Team
@@ -577,7 +578,7 @@ ${issueTypeLabel}: ${issue.title}
 ${comment.author_name || comment.author_email} commented:
 ${comment.body}
 
-View this issue in the BritePulse console: ${consoleUrl}
+You can reply directly to this email to add a comment, or view this issue in the BritePulse console: ${consoleUrl}
 
 — The ${app.name} Team
 
@@ -591,6 +592,10 @@ Powered by BritePulse
       from: {
         email: config.sendgridFromEmail,
         name: app.name,
+      },
+      replyTo: {
+        email: replyToAddress,
+        name: `${app.name} Issue Discussion`,
       },
       subject: `You were mentioned: ${issue.title}`,
       text,
