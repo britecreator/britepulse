@@ -2,7 +2,7 @@
  * Issue routes tests - Assignment, resolution notes, comments
  */
 
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { createMockIssue, createMockApp, createMockComment, resetIdCounter } from './test-utils.js';
@@ -40,11 +40,17 @@ vi.mock('../config.js', () => ({
 }));
 
 // Mock middleware - bypass auth and RBAC for route testing
-let mockAuthUser = {
+let mockAuthUser: {
+  user_id: string;
+  email: string;
+  name: string;
+  role: string;
+  app_access: string[];
+} = {
   user_id: 'user-1',
   email: 'admin@test.com',
   name: 'Admin',
-  role: 'Admin' as const,
+  role: 'Admin',
   app_access: ['app-001'],
 };
 

@@ -100,7 +100,6 @@ describe('Pipeline - Auto-assignment', () => {
   });
 
   it('should not auto-assign when event groups into existing issue', async () => {
-    const app = createMockApp({ app_id: 'app-001' });
     const event = createMockEvent({
       app_id: 'app-001',
       event_type: 'frontend_error',
@@ -113,7 +112,7 @@ describe('Pipeline - Auto-assignment', () => {
 
     // Mock fingerprinting to return a value
     const { extractFingerprintInput } = await import('../services/fingerprint.js');
-    vi.mocked(extractFingerprintInput).mockReturnValue({ type: 'TypeError', message: 'test' });
+    vi.mocked(extractFingerprintInput).mockReturnValue({ error_type: 'TypeError', message: 'test' });
 
     vi.mocked(firestoreService.createEvent).mockResolvedValue(event);
     vi.mocked(firestoreService.findIssueByFingerprint).mockResolvedValue(existingIssue);
