@@ -144,8 +144,8 @@ router.post(
         null
       );
 
-      // Filter to non-resolved issues
-      const activeIssues = issues.filter((i) => i.status !== 'resolved');
+      // Filter to non-resolved issues (resolved and wont_fix are both considered closed)
+      const activeIssues = issues.filter((i) => i.status !== 'resolved' && i.status !== 'wont_fix');
 
       // Check "only on issues" mode
       if (briefMode === 'only_on_issues' && activeIssues.length === 0 && !force) {

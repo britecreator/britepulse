@@ -63,7 +63,7 @@ export function generateBriefData(
     issues: rankedIssues,
     stats: {
       totalIssues24h: issues.filter(
-        (i) => i.status !== 'resolved'
+        (i) => i.status !== 'resolved' && i.status !== 'wont_fix'
       ).length,
       totalEvents24h: stats.totalEvents24h,
       newIssues24h: stats.newIssues24h,

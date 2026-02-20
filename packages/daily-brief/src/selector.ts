@@ -112,8 +112,8 @@ export function selectIssuesForBrief(
       return false;
     }
 
-    // Include resolved only if recently resolved and configured
-    if (issue.status === 'resolved') {
+    // Include resolved/wont_fix only if recently closed and configured
+    if (issue.status === 'resolved' || issue.status === 'wont_fix') {
       if (!config.includeResolved24h) return false;
       const lastSeenTime = new Date(issue.timestamps.last_seen_at).getTime();
       if (lastSeenTime < twentyFourHoursAgo) return false;

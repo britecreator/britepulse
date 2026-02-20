@@ -156,7 +156,7 @@ export default function AppDetailPage() {
 
     const guide = `# BritePulse Integration Guide for ${app.name}
 
-## Quick Start
+## Step 1: Add the SDK
 
 Add this script tag to your HTML \`<head>\`:
 
@@ -169,11 +169,94 @@ Add this script tag to your HTML \`<head>\`:
 ></script>
 \`\`\`
 
-That's it! The SDK will automatically:
+The SDK will automatically:
 - Show a feedback button in the bottom-right corner
 - Capture uncaught JavaScript errors
 - Capture network errors (fetch/XHR 4xx/5xx responses)
 - Track user sessions
+
+**Next:** Complete Step 2 to identify users, otherwise all feedback shows as "anonymous".
+
+## Step 2: Identify Users (Required)
+
+Without this step, all feedback and errors will show as "anonymous" in the BritePulse console.
+
+\`\`\`javascript
+// Helper functions - add to your app
+function setBritePulseUser(user) {
+  function trySetUser(attempts) {
+    if (attempts > 50) return; // Give up after 5 seconds
+    const instance = window.BritePulse?.getInstance();
+    if (instance) {
+      instance.setUser({
+        id: user.id,         // Required: unique identifier
+        email: user.email,   // Recommended: shows in "Reported By"
+        role: user.role      // Optional: "admin", "user", etc.
+      });
+    } else {
+      // SDK not ready yet, retry
+      setTimeout(() => trySetUser(attempts + 1), 100);
+    }
+  }
+  trySetUser(0);
+}
+
+function clearBritePulseUser() {
+  window.BritePulse?.getInstance()?.setUser(undefined);
+}
+\`\`\`
+
+> **Timing matters:** The SDK loads with \`defer\`, so \`getInstance()\` may return \`null\` if called too early. Always use the retry pattern above.
+
+### Example: Vanilla JS with server-injected user
+
+\`\`\`html
+<script>
+  // Assuming your server injects: window.AUTH_USER = { id: "...", email: "...", name: "..." }
+  if (window.AUTH_USER) {
+    setBritePulseUser({
+      id: window.AUTH_USER.id,
+      email: window.AUTH_USER.email
+    });
+  }
+</script>
+\`\`\`
+
+### Example: Firebase Auth
+
+\`\`\`javascript
+import { onAuthStateChanged } from 'firebase/auth';
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    setBritePulseUser({ id: user.uid, email: user.email });
+  } else {
+    clearBritePulseUser();
+  }
+});
+\`\`\`
+
+### Example: React with useEffect
+
+\`\`\`javascript
+useEffect(() => {
+  if (currentUser) {
+    setBritePulseUser({
+      id: currentUser.id,
+      email: currentUser.email
+    });
+  }
+  return () => clearBritePulseUser();
+}, [currentUser]);
+\`\`\`
+
+## Common Pitfalls
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| Feedback shows "anonymous" | \`setUser()\` never called | Implement Step 2 |
+| \`getInstance()\` returns \`null\` | Called before SDK initialized | Use retry pattern (see Step 2) |
+| \`setUser()\` doesn't work | Called on \`window.BritePulse\` directly | Must call on \`getInstance()\` result |
 
 ## Configuration
 
@@ -288,38 +371,6 @@ Props:
 - \`onError\`: Optional callback when error occurs
 - \`reportError\`: Whether to send to BritePulse (default: true)
 
-## User Identification (Important!)
-
-To see who submitted feedback in BritePulse, you must tell the SDK about the logged-in user. Without this, feedback will show as "anonymous".
-
-\`\`\`typescript
-// Call this after your user logs in (e.g., in your auth callback or useEffect)
-window.BritePulse?.getInstance()?.setUser({
-  id: user.id,           // Required: unique user identifier
-  email: user.email,     // Recommended: shows in "Reported By" column
-  role: user.role,       // Optional: e.g., "admin", "user", "guest"
-});
-
-// Call this when user logs out
-window.BritePulse?.getInstance()?.setUser(undefined);
-\`\`\`
-
-**Example with Firebase Auth:**
-\`\`\`typescript
-import { onAuthStateChanged } from 'firebase/auth';
-
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    window.BritePulse?.getInstance()?.setUser({
-      id: user.uid,
-      email: user.email || undefined,
-    });
-  } else {
-    window.BritePulse?.getInstance()?.setUser(undefined);
-  }
-});
-\`\`\`
-
 ## API Methods
 
 \`\`\`typescript
@@ -335,22 +386,19 @@ window.BritePulse?.openWidget();
 
 ## Image Attachments
 
-The feedback widget allows users to attach images (screenshots, error states, etc.) to provide visual context with their feedback.
+The feedback widget supports image attachments for visual context (screenshots, error states, etc.).
 
-### Widget Behavior
-- Users can click the attachment button (📎) in the feedback widget
-- Supported formats: JPEG, PNG, GIF, WebP
-- Maximum file size: 5MB per image
-- Users must opt-in to attach images (checkbox in widget)
+### Widget Usage
+- Click the **Attach Image** button in the feedback widget
+- Supported: JPEG, PNG, GIF, WebP (max 5MB)
+- A thumbnail preview shows before submission
+- Attachments appear in the Console under Issues > Events tab
 
-### Programmatic Attachment (Advanced)
-
-For programmatic feedback submission with attachments:
+### Programmatic Attachment
 
 \`\`\`typescript
-// Submit feedback with an image attachment
+// Submit feedback with an image
 async function submitFeedbackWithImage(imageFile: File) {
-  // Convert file to base64
   const toBase64 = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -361,28 +409,23 @@ async function submitFeedbackWithImage(imageFile: File) {
 
   const base64Data = await toBase64(imageFile);
 
-  // Use the SDK's submitFeedback method with attachments
   window.BritePulse?.getInstance()?.submitFeedback({
     category: 'bug',
-    description: 'User reported issue with screenshot',
+    description: 'Issue with screenshot attached',
     attachments: [{
       filename: imageFile.name,
       content_type: imageFile.type,
       data: base64Data,
-      user_opted_in: true,  // Required: user must consent
+      user_opted_in: true,  // Required
     }],
   });
 }
 \`\`\`
 
-### Viewing Attachments
-Attachments appear in the BritePulse console under the Events tab for each issue. Click thumbnails to view full-size images.
-
-### Storage & Privacy
-- Images are stored securely in Google Cloud Storage
-- Automatic 90-day retention (configurable)
-- Access requires authentication and app permissions
-- URLs are time-limited (15 minutes) for security
+### Storage Notes
+- Images stored securely in Google Cloud Storage
+- 90-day automatic retention
+- Time-limited signed URLs (15 min) for security
 
 ## Staging Environment
 
@@ -569,12 +612,12 @@ ${stageKey ? `\`\`\`html
             >
               <option value="disabled">Disabled</option>
               <option value="daily">Every day at scheduled time</option>
-              <option value="only_on_issues">Daily, only when there are new submissions</option>
+              <option value="only_on_issues">Daily, only when there are active issues</option>
             </select>
             <p className="mt-1 text-xs text-gray-500">
               {briefFrequency === 'disabled' && 'No email summaries will be sent'}
               {briefFrequency === 'daily' && 'Send summary every day, even if there are no new issues'}
-              {briefFrequency === 'only_on_issues' && 'Send summary only on days with new submissions'}
+              {briefFrequency === 'only_on_issues' && 'Send summary only when there are unresolved issues'}
             </p>
           </div>
 
