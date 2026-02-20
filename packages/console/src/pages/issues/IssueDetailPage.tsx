@@ -90,28 +90,8 @@ export default function IssueDetailPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasPrefilledRef = useRef(false);
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
-      </div>
-    );
-  }
-
-  if (error || !issue) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-600">
-          {error ? `Failed to load issue: ${error.message}` : 'Issue not found'}
-        </p>
-        <button onClick={() => navigate('/issues')} className="btn-primary mt-4">
-          Back to Issues
-        </button>
-      </div>
-    );
-  }
-
   // @mention candidates: reporter + team members (deduped)
+  // Must be before early returns to satisfy React hooks rules
   const mentionCandidates = useMemo(() => {
     const candidates: Array<{ email: string; name?: string; isReporter: boolean }> = [];
     if (issue?.reported_by?.email) {
@@ -133,6 +113,27 @@ export default function IssueDetailPage() {
       (c) => c.email.toLowerCase().includes(q) || (c.name && c.name.toLowerCase().includes(q))
     );
   }, [mentionCandidates, mentionQuery]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+      </div>
+    );
+  }
+
+  if (error || !issue) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600">
+          {error ? `Failed to load issue: ${error.message}` : 'Issue not found'}
+        </p>
+        <button onClick={() => navigate('/issues')} className="btn-primary mt-4">
+          Back to Issues
+        </button>
+      </div>
+    );
+  }
 
   function handleComposeFocus() {
     if (!hasPrefilledRef.current && issue?.reported_by?.email && commentText === '') {
