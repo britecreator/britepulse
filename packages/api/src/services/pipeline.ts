@@ -213,6 +213,10 @@ async function createIssueFromEvent(
         }
       : null;
 
+  // Look up the app to auto-assign to the first product owner
+  const app = await firestoreService.getApp(event.app_id);
+  const firstOwner = app?.owners?.po_emails?.[0];
+
   const issueInput: IssueInput = {
     app_id: event.app_id,
     environment: event.environment,
@@ -223,6 +227,7 @@ async function createIssueFromEvent(
     primary_fingerprint: fingerprint || undefined,
     initial_event_id: event.event_id,
     reported_by: reportedBy,
+    ...(firstOwner && { routing: { assigned_to: firstOwner } }),
   };
 
   return firestoreService.createIssue(issueInput);

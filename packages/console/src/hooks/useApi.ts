@@ -206,10 +206,14 @@ export function useIssueEvents(issueId: string) {
 export function useUpdateIssueStatus(issueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { status: IssueStatus; reason?: string }) =>
+    mutationFn: (data: { status: IssueStatus; reason?: string; resolution_note?: string }) =>
       fetchApi<{ data: Issue }>(`/issues/${issueId}/actions/set-status`, {
         method: 'POST',
-        body: JSON.stringify({ status: data.status, reason: data.reason || 'Status updated via console' }),
+        body: JSON.stringify({
+          status: data.status,
+          reason: data.reason || 'Status updated via console',
+          ...(data.resolution_note && { resolution_note: data.resolution_note }),
+        }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
@@ -225,6 +229,21 @@ export function useUpdateIssueSeverity(issueId: string) {
       fetchApi<{ data: Issue }>(`/issues/${issueId}/actions/set-severity`, {
         method: 'POST',
         body: JSON.stringify({ severity: data.severity, reason: data.reason || 'Severity updated via console' }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      queryClient.invalidateQueries({ queryKey: ['issues', issueId] });
+    },
+  });
+}
+
+export function useAssignIssue(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { assigned_to: string; reason?: string }) =>
+      fetchApi<{ data: Issue }>(`/issues/${issueId}/actions/assign`, {
+        method: 'POST',
+        body: JSON.stringify({ assigned_to: data.assigned_to, reason: data.reason || 'Reassigned via console' }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
@@ -262,6 +281,42 @@ export function useMergeIssues() {
       }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
+    },
+  });
+}
+
+// Comments
+interface IssueComment {
+  comment_id: string;
+  issue_id: string;
+  author_email: string;
+  author_name?: string;
+  body: string;
+  source: 'console' | 'email';
+  created_at: string;
+}
+
+export function useIssueComments(issueId: string) {
+  return useQuery({
+    queryKey: ['issues', issueId, 'comments'],
+    queryFn: () =>
+      fetchApi<{ data: IssueComment[] }>(`/issues/${issueId}/comments`).then(
+        (r) => r.data
+      ),
+    enabled: !!issueId,
+  });
+}
+
+export function useAddComment(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { body: string }) =>
+      fetchApi<{ data: IssueComment }>(`/issues/${issueId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues', issueId, 'comments'] });
     },
   });
 }

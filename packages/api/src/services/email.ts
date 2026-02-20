@@ -5,7 +5,7 @@
 
 import sgMail from '@sendgrid/mail';
 import { config } from '../config.js';
-import type { Issue, App } from '@britepulse/shared';
+import type { Issue, App, IssueComment } from '@britepulse/shared';
 
 let isConfigured = false;
 
@@ -48,7 +48,7 @@ export interface SendResult {
 /**
  * Generate HTML email for issue resolved notification
  */
-function generateResolvedEmailHtml(issue: Issue, app: App): string {
+function generateResolvedEmailHtml(issue: Issue, app: App, resolutionNote?: string): string {
   const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
                          issue.issue_type === 'feedback' ? 'Feedback' :
                          issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
@@ -85,6 +85,13 @@ function generateResolvedEmailHtml(issue: Issue, app: App): string {
       <p style="margin: 0; color: #6b7280; font-size: 14px;">${safeDescription}${descriptionEllipsis}</p>
     </div>
 
+    ${resolutionNote ? `
+    <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+      <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #065f46;">Note from the team:</p>
+      <p style="margin: 0; color: #374151; font-size: 14px;">${escapeHtml(resolutionNote)}</p>
+    </div>
+    ` : ''}
+
     <p>Thank you for taking the time to report this. Your feedback helps us improve ${safeAppName}!</p>
 
     <p style="margin-bottom: 0; color: #6b7280; font-size: 14px;">
@@ -103,7 +110,7 @@ function generateResolvedEmailHtml(issue: Issue, app: App): string {
 /**
  * Generate plain text email for issue resolved notification
  */
-function generateResolvedEmailText(issue: Issue, app: App): string {
+function generateResolvedEmailText(issue: Issue, app: App, resolutionNote?: string): string {
   const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
                          issue.issue_type === 'feedback' ? 'Feedback' :
                          issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
@@ -118,7 +125,7 @@ Great news! Your ${issueTypeLabel.toLowerCase()} for ${app.name} has been resolv
 ${issueTypeLabel}: ${issue.title}
 
 ${issue.description.substring(0, 300)}${issue.description.length > 300 ? '...' : ''}
-
+${resolutionNote ? `\nNote from the team:\n${resolutionNote}\n` : ''}
 Thank you for taking the time to report this. Your feedback helps us improve ${app.name}!
 
 — The ${app.name} Team
@@ -131,7 +138,7 @@ Powered by BritePulse
 /**
  * Generate HTML email for issue won't fix notification
  */
-function generateWontFixEmailHtml(issue: Issue, app: App): string {
+function generateWontFixEmailHtml(issue: Issue, app: App, resolutionNote?: string): string {
   const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
                          issue.issue_type === 'feedback' ? 'Feedback' :
                          issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
@@ -168,7 +175,14 @@ function generateWontFixEmailHtml(issue: Issue, app: App): string {
       <p style="margin: 0; color: #6b7280; font-size: 14px;">${safeDescription}${descriptionEllipsis}</p>
     </div>
 
+    ${resolutionNote ? `
+    <div style="background: #f9fafb; border-left: 4px solid #6b7280; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+      <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #374151;">Note from the team:</p>
+      <p style="margin: 0; color: #374151; font-size: 14px;">${escapeHtml(resolutionNote)}</p>
+    </div>
+    ` : `
     <p>After careful review, we've determined that this issue will not be addressed at this time. This could be due to various factors such as current priorities, technical constraints, or alignment with our product direction.</p>
+    `}
 
     <p>We understand this may not be the outcome you were hoping for, and we genuinely value your input. If you have any questions or would like to discuss this further, please don't hesitate to reach out.</p>
 
@@ -188,7 +202,7 @@ function generateWontFixEmailHtml(issue: Issue, app: App): string {
 /**
  * Generate plain text email for issue won't fix notification
  */
-function generateWontFixEmailText(issue: Issue, app: App): string {
+function generateWontFixEmailText(issue: Issue, app: App, resolutionNote?: string): string {
   const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
                          issue.issue_type === 'feedback' ? 'Feedback' :
                          issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
@@ -203,9 +217,7 @@ Thank you for taking the time to submit your ${issueTypeLabel.toLowerCase()} for
 ${issueTypeLabel}: ${issue.title}
 
 ${issue.description.substring(0, 300)}${issue.description.length > 300 ? '...' : ''}
-
-After careful review, we've determined that this issue will not be addressed at this time. This could be due to various factors such as current priorities, technical constraints, or alignment with our product direction.
-
+${resolutionNote ? `\nNote from the team:\n${resolutionNote}\n` : `\nAfter careful review, we've determined that this issue will not be addressed at this time. This could be due to various factors such as current priorities, technical constraints, or alignment with our product direction.\n`}
 We understand this may not be the outcome you were hoping for, and we genuinely value your input. If you have any questions or would like to discuss this further, please don't hesitate to reach out.
 
 — The ${app.name} Team
@@ -220,7 +232,8 @@ Powered by BritePulse
  */
 export async function sendWontFixNotification(
   issue: Issue,
-  app: App
+  app: App,
+  resolutionNote?: string
 ): Promise<SendResult> {
   // Check if we have a reporter email
   if (!issue.reported_by?.email) {
@@ -249,8 +262,8 @@ export async function sendWontFixNotification(
         name: app.name,
       },
       subject: `Update on Your ${issueTypeLabel} - ${issue.title}`,
-      text: generateWontFixEmailText(issue, app),
-      html: generateWontFixEmailHtml(issue, app),
+      text: generateWontFixEmailText(issue, app, resolutionNote),
+      html: generateWontFixEmailHtml(issue, app, resolutionNote),
       categories: ['issue-wont-fix', app.app_id],
       customArgs: {
         issue_id: issue.issue_id,
@@ -280,7 +293,8 @@ export async function sendWontFixNotification(
  */
 export async function sendResolvedNotification(
   issue: Issue,
-  app: App
+  app: App,
+  resolutionNote?: string
 ): Promise<SendResult> {
   // Check if we have a reporter email
   if (!issue.reported_by?.email) {
@@ -309,8 +323,8 @@ export async function sendResolvedNotification(
         name: app.name,
       },
       subject: `Your ${issueTypeLabel} Has Been Resolved - ${issue.title}`,
-      text: generateResolvedEmailText(issue, app),
-      html: generateResolvedEmailHtml(issue, app),
+      text: generateResolvedEmailText(issue, app, resolutionNote),
+      html: generateResolvedEmailHtml(issue, app, resolutionNote),
       categories: ['issue-resolved', app.app_id],
       customArgs: {
         issue_id: issue.issue_id,
@@ -328,6 +342,138 @@ export async function sendResolvedNotification(
     };
   } catch (error) {
     console.error('[Email] SendGrid error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Send notification email when a comment is added to an issue
+ * Includes Reply-To header for inbound email replies
+ */
+export async function sendCommentNotification(
+  issue: Issue,
+  app: App,
+  comment: IssueComment
+): Promise<SendResult> {
+  if (!issue.reported_by?.email) {
+    return { success: false, error: 'No reporter email available' };
+  }
+
+  if (!ensureConfigured()) {
+    return { success: false, error: 'SendGrid not configured' };
+  }
+
+  const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
+                         issue.issue_type === 'feedback' ? 'Feedback' :
+                         issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
+
+  const safeAppName = escapeHtml(app.name);
+  const safeTitle = escapeHtml(issue.title);
+  const safeBody = escapeHtml(comment.body);
+  const safeAuthor = escapeHtml(comment.author_name || comment.author_email);
+
+  // Reply-to address encodes the issue ID for inbound parse routing
+  const replyToAddress = `issue+${issue.issue_id}@${config.inboundEmailDomain || 'reply.britepulse.io'}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Comment on Your ${issueTypeLabel}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">New Comment</h1>
+  </div>
+
+  <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+    <p style="margin-top: 0;">Hi there,</p>
+
+    <p>There's a new comment on your ${issueTypeLabel.toLowerCase()} for <strong>${safeAppName}</strong>:</p>
+
+    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;">
+        <strong style="color: #374151;">${issueTypeLabel}:</strong> ${safeTitle}
+      </p>
+      <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 12px;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280;">
+          <strong>${safeAuthor}</strong> commented:
+        </p>
+        <p style="margin: 0; color: #111827; font-size: 14px; white-space: pre-wrap;">${safeBody}</p>
+      </div>
+    </div>
+
+    <p>You can reply directly to this email to add a comment back.</p>
+
+    <p style="margin-bottom: 0; color: #6b7280; font-size: 14px;">
+      — The ${safeAppName} Team
+    </p>
+  </div>
+
+  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+    <p style="margin: 0;">Powered by <a href="https://britepulse.io" style="color: #6b7280;">BritePulse</a></p>
+  </div>
+</body>
+</html>
+`;
+
+  const text = `
+New Comment on Your ${issueTypeLabel}
+
+Hi there,
+
+There's a new comment on your ${issueTypeLabel.toLowerCase()} for ${app.name}:
+
+${issueTypeLabel}: ${issue.title}
+
+${comment.author_name || comment.author_email} commented:
+${comment.body}
+
+You can reply directly to this email to add a comment back.
+
+— The ${app.name} Team
+
+---
+Powered by BritePulse
+`.trim();
+
+  try {
+    const msg = {
+      to: issue.reported_by.email,
+      from: {
+        email: config.sendgridFromEmail,
+        name: app.name,
+      },
+      replyTo: {
+        email: replyToAddress,
+        name: `${app.name} Issue Discussion`,
+      },
+      subject: `Re: Your ${issueTypeLabel} - ${issue.title}`,
+      text,
+      html,
+      categories: ['issue-comment', app.app_id],
+      customArgs: {
+        issue_id: issue.issue_id,
+        app_id: app.app_id,
+        comment_id: comment.comment_id,
+      },
+    };
+
+    const [response] = await sgMail.send(msg);
+
+    console.log(`[Email] Sent comment notification to ${issue.reported_by.email} for issue ${issue.issue_id}`);
+
+    return {
+      success: true,
+      messageId: response.headers['x-message-id']?.toString(),
+    };
+  } catch (error) {
+    console.error('[Email] SendGrid comment error:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

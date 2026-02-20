@@ -24,6 +24,7 @@ import {
   usersRoutes,
   briefsRoutes,
   attachmentsRoutes,
+  inboundEmailRoutes,
 } from './routes/index.js';
 
 // Validate configuration
@@ -143,6 +144,7 @@ app.use('/admin/users', usersRoutes);
 app.use('/issues', issuesRoutes);
 app.use('/briefs', briefsRoutes);
 app.use('/attachments', attachmentsRoutes);
+app.use('/webhooks/inbound-email', inboundEmailRoutes);
 
 // 404 handler
 app.use((_req, res) => {

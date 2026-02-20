@@ -18,7 +18,7 @@ import {
 } from '../middleware/index.js';
 import * as firestoreService from '../services/firestore.js';
 import { generateContextFile, generateContextJSON } from '../services/context-generator.js';
-import { sendResolvedNotification, sendWontFixNotification } from '../services/email.js';
+import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification } from '../services/email.js';
 import { config } from '../config.js';
 
 const router: IRouter = Router();
@@ -106,7 +106,7 @@ router.post(
   canChangeIssueStatus,
   asyncHandler(async (req, res) => {
     const { issue_id } = req.params;
-    const { status, reason } = req.body;
+    const { status, reason, resolution_note } = req.body;
 
     if (!status || !reason) {
       throw APIError.badRequest('status and reason are required');
@@ -139,15 +139,22 @@ router.post(
       }
     }
 
-    const updatedIssue = await firestoreService.updateIssue(issue_id, {
+    // Include resolution_note when resolving or marking won't fix
+    const updatePayload: { status: IssueStatus; reason: string; resolution_note?: string } = {
       status: status as IssueStatus,
       reason,
-    });
+    };
+    if ((status === 'resolved' || status === 'wont_fix') && resolution_note) {
+      updatePayload.resolution_note = resolution_note;
+    }
+
+    const updatedIssue = await firestoreService.updateIssue(issue_id, updatePayload);
 
     await logAuditAction(req, 'change_status', 'issue', issue_id, {
       previous_value: issue.status,
       new_value: status,
       reason,
+      ...(resolution_note && { resolution_note }),
     });
 
     // Send email notification when issue is resolved and we have reporter email
@@ -155,7 +162,7 @@ router.post(
       const app = await firestoreService.getApp(issue.app_id);
       if (app) {
         // Send async - don't block the response
-        sendResolvedNotification(updatedIssue, app).catch((err) => {
+        sendResolvedNotification(updatedIssue, app, resolution_note).catch((err) => {
           console.error('[Issues] Failed to send resolved notification:', err);
         });
       }
@@ -166,7 +173,7 @@ router.post(
       const app = await firestoreService.getApp(issue.app_id);
       if (app) {
         // Send async - don't block the response
-        sendWontFixNotification(updatedIssue, app).catch((err) => {
+        sendWontFixNotification(updatedIssue, app, resolution_note).catch((err) => {
           console.error('[Issues] Failed to send wont fix notification:', err);
         });
       }
@@ -224,10 +231,11 @@ router.post(
 /**
  * POST /issues/:issue_id/actions/assign
  * Assign issue to a user/team
+ * Only the current assignee or an Admin can reassign
  */
 router.post(
   '/:issue_id/actions/assign',
-  requirePermission('change_status'),
+  oauthAuth(true),
   asyncHandler(async (req, res) => {
     const { issue_id } = req.params;
     const { assigned_to, reason } = req.body;
@@ -235,6 +243,8 @@ router.post(
     if (!assigned_to || !reason) {
       throw APIError.badRequest('assigned_to and reason are required');
     }
+
+    const user = req.auth!.user!;
 
     const issue = await firestoreService.getIssue(issue_id);
     if (!issue) {
@@ -245,6 +255,13 @@ router.post(
     const accessibleAppIds = getAccessibleAppIds(req);
     if (accessibleAppIds && !accessibleAppIds.includes(issue.app_id)) {
       throw APIError.forbidden('Access to this issue is denied');
+    }
+
+    // Only the current assignee or an Admin can reassign
+    const isAdmin = user.role === 'Admin';
+    const isCurrentAssignee = user.email === issue.routing?.assigned_to;
+    if (!isAdmin && !isCurrentAssignee) {
+      throw APIError.forbidden('Only the current assignee or an Admin can reassign this issue');
     }
 
     const updatedIssue = await firestoreService.updateIssue(issue_id, {
@@ -392,6 +409,84 @@ router.post(
     });
 
     res.json({ data: updatedIssue });
+  })
+);
+
+/**
+ * GET /issues/:issue_id/comments
+ * Get comments for an issue
+ */
+router.get(
+  '/:issue_id/comments',
+  requirePermission('view_issue_detail'),
+  asyncHandler(async (req, res) => {
+    const { issue_id } = req.params;
+
+    const issue = await firestoreService.getIssue(issue_id);
+    if (!issue) {
+      throw APIError.notFound('Issue');
+    }
+
+    const accessibleAppIds = getAccessibleAppIds(req);
+    if (accessibleAppIds && !accessibleAppIds.includes(issue.app_id)) {
+      throw APIError.forbidden('Access to this issue is denied');
+    }
+
+    const comments = await firestoreService.getComments(issue_id);
+    res.json({ data: comments });
+  })
+);
+
+/**
+ * POST /issues/:issue_id/comments
+ * Add a comment to an issue
+ */
+router.post(
+  '/:issue_id/comments',
+  canChangeIssueStatus,
+  asyncHandler(async (req, res) => {
+    const { issue_id } = req.params;
+    const { body } = req.body;
+
+    if (!body || typeof body !== 'string' || body.trim().length === 0) {
+      throw APIError.badRequest('body is required');
+    }
+
+    const user = req.auth!.user!;
+
+    const issue = await firestoreService.getIssue(issue_id);
+    if (!issue) {
+      throw APIError.notFound('Issue');
+    }
+
+    const accessibleAppIds = getAccessibleAppIds(req);
+    if (accessibleAppIds && !accessibleAppIds.includes(issue.app_id)) {
+      throw APIError.forbidden('Access to this issue is denied');
+    }
+
+    const comment = await firestoreService.createComment(issue_id, {
+      issue_id,
+      author_email: user.email,
+      author_name: user.name,
+      body: body.trim(),
+      source: 'console',
+    });
+
+    await logAuditAction(req, 'add_comment', 'issue', issue_id, {
+      comment_id: comment.comment_id,
+    });
+
+    // Send email notification to reporter if they have an email
+    if (issue.reported_by?.email) {
+      const app = await firestoreService.getApp(issue.app_id);
+      if (app) {
+        sendCommentNotification(issue, app, comment).catch((err) => {
+          console.error('[Issues] Failed to send comment notification:', err);
+        });
+      }
+    }
+
+    res.json({ data: comment });
   })
 );
 

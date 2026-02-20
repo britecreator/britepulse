@@ -66,6 +66,8 @@ export interface Issue {
   tags?: string[];
   related_issue_ids?: string[];
 
+  resolution_note?: string; // note added when resolved or won't fix
+
   // Computed for display (not stored)
   priority_score?: number;
 }
@@ -83,6 +85,7 @@ export interface IssueInput {
   primary_fingerprint?: string;
   initial_event_id: string;
   reported_by?: IssueReporter | null;
+  routing?: IssueRouting;
   tags?: string[];
 }
 
@@ -93,6 +96,7 @@ export interface IssueUpdateInput {
   status?: IssueStatus;
   severity?: Severity;
   assigned_to?: string;
+  resolution_note?: string;
   tags?: string[];
   ai_analysis?: AIAnalysis; // updated when AI triage runs
   reason?: string; // required for audit (optional for AI updates)
@@ -154,6 +158,19 @@ export type IssueSortField =
 export interface IssueSortOptions {
   field: IssueSortField;
   direction: 'asc' | 'desc';
+}
+
+/**
+ * Comment on an issue (conversation thread)
+ */
+export interface IssueComment {
+  comment_id: string;
+  issue_id: string;
+  author_email: string;
+  author_name?: string;
+  body: string;
+  source: 'console' | 'email';
+  created_at: string; // ISO timestamp
 }
 
 /**

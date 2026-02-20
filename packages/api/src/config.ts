@@ -33,6 +33,10 @@ export const config = {
   // Scheduler authentication (for Cloud Scheduler to trigger daily briefs)
   schedulerAuthToken: process.env.SCHEDULER_AUTH_TOKEN || '',
 
+  // Inbound email (for comment replies via SendGrid Inbound Parse)
+  inboundEmailDomain: process.env.INBOUND_EMAIL_DOMAIN || 'reply.britepulse.io',
+  inboundEmailSecret: process.env.INBOUND_EMAIL_SECRET || '',
+
   // Console URL (for links in emails)
   consoleBaseUrl: process.env.CONSOLE_BASE_URL || 'http://localhost:3000',
 

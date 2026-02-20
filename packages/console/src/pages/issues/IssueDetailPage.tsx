@@ -5,6 +5,10 @@ import {
   useIssueEvents,
   useUpdateIssueStatus,
   useUpdateIssueSeverity,
+  useAssignIssue,
+  useUsers,
+  useIssueComments,
+  useAddComment,
   useAttachmentUrl,
 } from '../../hooks/useApi';
 import { useAuth } from '../../contexts/AuthContext';
@@ -64,13 +68,20 @@ function AttachmentThumbnail({ attachmentId }: { attachmentId: string }) {
 export default function IssueDetailPage() {
   const { issueId } = useParams<{ issueId: string }>();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const { data: issue, isLoading, error } = useIssue(issueId!);
   const { data: events, isLoading: eventsLoading } = useIssueEvents(issueId!);
   const updateStatus = useUpdateIssueStatus(issueId!);
   const updateSeverity = useUpdateIssueSeverity(issueId!);
+  const assignIssue = useAssignIssue(issueId!);
+  const { data: users } = useUsers();
+  const { data: comments, isLoading: commentsLoading } = useIssueComments(issueId!);
+  const addComment = useAddComment(issueId!);
 
-  const [activeTab, setActiveTab] = useState<'timeline' | 'events'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'events' | 'comments'>('timeline');
+  const [commentText, setCommentText] = useState('');
+  const [resolutionModal, setResolutionModal] = useState<{ status: IssueStatus } | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
 
   if (isLoading) {
     return (
@@ -94,11 +105,36 @@ export default function IssueDetailPage() {
   }
 
   async function handleStatusChange(status: IssueStatus) {
+    if (status === 'resolved' || status === 'wont_fix') {
+      setResolutionModal({ status });
+      setResolutionNote('');
+      return;
+    }
     await updateStatus.mutateAsync({ status });
+  }
+
+  async function handleResolutionSubmit() {
+    if (!resolutionModal) return;
+    await updateStatus.mutateAsync({
+      status: resolutionModal.status,
+      resolution_note: resolutionNote || undefined,
+    });
+    setResolutionModal(null);
+    setResolutionNote('');
   }
 
   async function handleSeverityChange(severity: Severity) {
     await updateSeverity.mutateAsync({ severity });
+  }
+
+  async function handleAssigneeChange(assignedTo: string) {
+    await assignIssue.mutateAsync({ assigned_to: assignedTo });
+  }
+
+  async function handleAddComment() {
+    if (!commentText.trim()) return;
+    await addComment.mutateAsync({ body: commentText.trim() });
+    setCommentText('');
   }
 
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
@@ -129,6 +165,8 @@ export default function IssueDetailPage() {
 
   // Admin, PO, and Engineer can edit issues
   const canEdit = hasRole('Admin') || hasRole('PO') || hasRole('Engineer');
+  // Only the current assignee or an Admin can reassign
+  const canReassign = user?.role === 'Admin' || user?.email === issue?.routing?.assigned_to;
 
   return (
     <div className="space-y-6">
@@ -161,6 +199,9 @@ export default function IssueDetailPage() {
             </div>
             <div className="mt-1 text-sm text-gray-500">
               User: {issue.reported_by?.email || issue.reported_by?.user_id || 'Anonymous'}
+            </div>
+            <div className="mt-1 text-sm text-gray-500">
+              Assigned to: {issue.routing?.assigned_to || 'Unassigned'}
             </div>
           </div>
           <button
@@ -238,6 +279,22 @@ export default function IssueDetailPage() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="label">Assigned To</label>
+              <select
+                className="input mt-1"
+                value={issue.routing?.assigned_to || ''}
+                onChange={(e) => handleAssigneeChange(e.target.value)}
+                disabled={!canReassign || assignIssue.isPending}
+              >
+                <option value="">Unassigned</option>
+                {users?.map((u) => (
+                  <option key={u.email} value={u.email}>
+                    {u.name || u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       )}
@@ -265,6 +322,16 @@ export default function IssueDetailPage() {
               }`}
             >
               Events ({events?.length ?? 0})
+            </button>
+            <button
+              onClick={() => setActiveTab('comments')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'comments'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Comments ({comments?.length ?? 0})
             </button>
             {events?.some((e) => e.attachment_refs && e.attachment_refs.length > 0) && (
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-amber-400 text-amber-900 shadow-sm">
@@ -355,6 +422,12 @@ export default function IssueDetailPage() {
                               Issue resolved
                             </p>
                           </div>
+                          {issue.resolution_note && (
+                            <div className="mt-2 bg-green-50 border-l-4 border-green-400 p-3 rounded-r">
+                              <p className="text-xs font-semibold text-green-800 mb-1">Note:</p>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{issue.resolution_note}</p>
+                            </div>
+                          )}
                           <div className="mt-1 text-sm text-gray-500">
                             {formatDate(issue.timestamps.resolved_at)}
                           </div>
@@ -380,6 +453,12 @@ export default function IssueDetailPage() {
                               Marked as won't fix
                             </p>
                           </div>
+                          {issue.resolution_note && (
+                            <div className="mt-2 bg-gray-50 border-l-4 border-gray-400 p-3 rounded-r">
+                              <p className="text-xs font-semibold text-gray-600 mb-1">Note:</p>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{issue.resolution_note}</p>
+                            </div>
+                          )}
                           <div className="mt-1 text-sm text-gray-500">
                             {formatDate(issue.timestamps.wont_fix_at)}
                           </div>
@@ -473,8 +552,103 @@ export default function IssueDetailPage() {
               )}
             </div>
           )}
+
+          {activeTab === 'comments' && (
+            <div>
+              {commentsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+                </div>
+              ) : comments?.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No comments yet
+                </div>
+              ) : (
+                <div className="space-y-4 mb-6">
+                  {comments?.map((comment) => (
+                    <div key={comment.comment_id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-gray-900">
+                            {comment.author_name || comment.author_email}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            comment.source === 'email'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {comment.source === 'email' ? 'via email' : 'console'}
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {formatDate(comment.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Compose area */}
+              {canEdit && (
+                <div className="border-t pt-4">
+                  <textarea
+                    className="input w-full h-20 resize-none"
+                    placeholder="Add a comment..."
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                  />
+                  <div className="flex justify-end mt-2">
+                    <button
+                      className="btn-primary"
+                      onClick={handleAddComment}
+                      disabled={!commentText.trim() || addComment.isPending}
+                    >
+                      {addComment.isPending ? 'Sending...' : 'Send'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Resolution Note Modal */}
+      {resolutionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {resolutionModal.status === 'resolved' ? 'Resolve Issue' : "Mark as Won't Fix"}
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Add an optional note that will be included in the email to the reporter and shown on the issue.
+            </p>
+            <textarea
+              className="input w-full h-24 resize-none"
+              placeholder="Add a note (optional)..."
+              value={resolutionNote}
+              onChange={(e) => setResolutionNote(e.target.value)}
+            />
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                className="btn-secondary"
+                onClick={() => setResolutionModal(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleResolutionSubmit}
+                disabled={updateStatus.isPending}
+              >
+                {updateStatus.isPending ? 'Saving...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

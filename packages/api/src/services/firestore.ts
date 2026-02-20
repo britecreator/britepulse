@@ -21,6 +21,7 @@ import type {
   UserInput,
   InstallKeys,
   Attachment,
+  IssueComment,
 } from '@britepulse/shared';
 
 // Initialize Firebase Admin
@@ -303,6 +304,7 @@ export async function createIssue(input: IssueInput): Promise<Issue> {
       last_seen_at: now,
     },
     reported_by: input.reported_by || null,
+    ...(input.routing && { routing: input.routing }),
     tags: input.tags || [],
   };
 
@@ -327,7 +329,7 @@ export async function updateIssue(
   const doc = await docRef.get();
   if (!doc.exists) return null;
 
-  const { reason, ...updateFields } = updates;
+  const { reason, assigned_to, resolution_note, ...updateFields } = updates;
   const now = new Date().toISOString();
 
   // Build the update object
@@ -335,6 +337,16 @@ export async function updateIssue(
     ...updateFields,
     'timestamps.last_seen_at': now,
   };
+
+  // Store assigned_to under routing.assigned_to (not top-level)
+  if (assigned_to !== undefined) {
+    updateData['routing.assigned_to'] = assigned_to;
+  }
+
+  // Store resolution note directly on the issue
+  if (resolution_note !== undefined) {
+    updateData['resolution_note'] = resolution_note;
+  }
 
   // Set resolved_at when status changes to resolved
   if (updates.status === 'resolved') {
@@ -651,6 +663,44 @@ export async function mergeIssues(
   // Return updated target issue
   const updatedDoc = await targetRef.get();
   return updatedDoc.data() as Issue;
+}
+
+// ============ Comment Operations ============
+
+export async function createComment(
+  issueId: string,
+  comment: Omit<IssueComment, 'comment_id' | 'created_at'>
+): Promise<IssueComment> {
+  const firestore = getFirestore();
+  const commentId = uuidv4();
+  const now = new Date().toISOString();
+
+  const commentDoc: IssueComment = {
+    ...comment,
+    comment_id: commentId,
+    created_at: now,
+  };
+
+  await firestore
+    .collection(COLLECTIONS.issues)
+    .doc(issueId)
+    .collection('comments')
+    .doc(commentId)
+    .set(commentDoc);
+
+  return commentDoc;
+}
+
+export async function getComments(issueId: string): Promise<IssueComment[]> {
+  const firestore = getFirestore();
+  const snapshot = await firestore
+    .collection(COLLECTIONS.issues)
+    .doc(issueId)
+    .collection('comments')
+    .orderBy('created_at', 'asc')
+    .get();
+
+  return snapshot.docs.map((doc) => doc.data() as IssueComment);
 }
 
 // ============ Audit Log Operations ============

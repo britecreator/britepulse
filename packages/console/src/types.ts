@@ -127,6 +127,10 @@ export interface IssueReporter {
   email?: string;
 }
 
+export interface IssueRouting {
+  assigned_to?: string;
+}
+
 export interface Issue {
   issue_id: string;
   app_id: string;
@@ -140,7 +144,9 @@ export interface Issue {
   counts: IssueCounts;
   timestamps: IssueTimestamps;
   priority_score?: number;
+  routing?: IssueRouting;
   assigned_to?: string;
+  resolution_note?: string;
   reported_by?: IssueReporter | null;
   ai_analysis?: AIAnalysis;
 }
