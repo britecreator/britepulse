@@ -164,6 +164,7 @@ export function useSendTestBrief(appId: string) {
 export function useIssues(filters: Partial<IssueFilters> = {}) {
   const params = new URLSearchParams();
   if (filters.app_id) params.set('app_id', filters.app_id);
+  if (filters.app_ids?.length) params.set('app_ids', filters.app_ids.join(','));
   if (filters.environment) params.set('environment', filters.environment);
   if (filters.status?.length) params.set('status', filters.status.join(','));
   if (filters.severity?.length) params.set('severity', filters.severity.join(','));

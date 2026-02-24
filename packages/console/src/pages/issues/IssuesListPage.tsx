@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useIssues, useApps } from '../../hooks/useApi';
+import { useMyAppIds } from '../../hooks/useMyAppIds';
 import type { IssueStatus, Severity, Environment, Issue } from '../../types';
 
 const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'wont_fix'];
@@ -30,6 +31,9 @@ function formatDate(dateString: string): string {
 }
 
 export default function IssuesListPage() {
+  const { myAppIds, ownsApps } = useMyAppIds();
+  const [appScope, setAppScope] = useState<'my_apps' | 'all_apps'>('my_apps');
+
   // Default to showing active statuses (exclude 'resolved' and 'wont_fix')
   const [filters, setFilters] = useState({
     app_id: '',
@@ -43,8 +47,27 @@ export default function IssuesListPage() {
     page_size: 25,
   });
 
-  const { data, isLoading, error } = useIssues(filters);
   const { data: apps } = useApps();
+
+  // Filter apps shown in dropdown based on scope
+  const filteredApps = useMemo(() => {
+    if (!apps) return [];
+    if (appScope === 'my_apps' && ownsApps) {
+      return apps.filter(app => myAppIds.includes(app.app_id));
+    }
+    return apps;
+  }, [apps, appScope, ownsApps, myAppIds]);
+
+  // Build effective filters for the API call
+  const effectiveFilters = useMemo(() => {
+    const base = { ...filters };
+    if (appScope === 'my_apps' && ownsApps && !filters.app_id) {
+      return { ...base, app_ids: myAppIds };
+    }
+    return base;
+  }, [filters, appScope, ownsApps, myAppIds]);
+
+  const { data, isLoading, error } = useIssues(effectiveFilters);
 
   // Create a map of app_id to app name for display
   const appNameMap = useMemo(() => {
@@ -104,6 +127,37 @@ export default function IssuesListPage() {
 
       {/* Filters */}
       <div className="card p-4">
+        {ownsApps && (
+          <div className="mb-4 flex items-center space-x-1 bg-gray-100 rounded-lg p-1 w-fit">
+            <button
+              onClick={() => {
+                setAppScope('my_apps');
+                setFilters(f => ({ ...f, app_id: '', page: 1 }));
+              }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                appScope === 'my_apps'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              My Apps
+            </button>
+            <button
+              onClick={() => {
+                setAppScope('all_apps');
+                setFilters(f => ({ ...f, app_id: '', page: 1 }));
+              }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                appScope === 'all_apps'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              All Apps
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="label">Application</label>
@@ -112,8 +166,10 @@ export default function IssuesListPage() {
               value={filters.app_id}
               onChange={(e) => setFilters((f) => ({ ...f, app_id: e.target.value, page: 1 }))}
             >
-              <option value="">All Apps</option>
-              {apps?.map((app) => (
+              <option value="">
+                {appScope === 'my_apps' && ownsApps ? 'All My Apps' : 'All Apps'}
+              </option>
+              {filteredApps?.map((app) => (
                 <option key={app.app_id} value={app.app_id}>
                   {app.name}
                 </option>

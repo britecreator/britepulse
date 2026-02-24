@@ -1,14 +1,17 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useIssues, useApps } from '../hooks/useApi';
+import { useMyAppIds } from '../hooks/useMyAppIds';
 
 export default function DashboardPage() {
   const { user, hasRole } = useAuth();
+  const { myAppIds, ownsApps } = useMyAppIds();
   const { data: issuesData, isLoading: issuesLoading } = useIssues({
     status: ['new', 'triaged', 'in_progress'],
     page_size: 5,
     sort_by: 'priority_score',
     sort_dir: 'desc',
+    ...(ownsApps && { app_ids: myAppIds }),
   });
   const { data: apps, isLoading: appsLoading } = useApps();
 

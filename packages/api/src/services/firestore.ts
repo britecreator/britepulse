@@ -404,26 +404,33 @@ export async function getIssues(
     app_ids?: string[];
   } = {};
 
-  // Apply app access filter
-  if (accessibleAppIds && accessibleAppIds.length > 0) {
-    // If user has specific app access and also filtering by app_id, use equality
-    if (filters.app_id && accessibleAppIds.includes(filters.app_id)) {
-      query = query.where('app_id', '==', filters.app_id);
-    } else if (filters.app_id) {
-      // User is filtering by an app they don't have access to
-      return { issues: [], total: 0 };
-    } else if (accessibleAppIds.length === 1) {
-      query = query.where('app_id', '==', accessibleAppIds[0]);
-    } else if (accessibleAppIds.length <= 10) {
-      query = query.where('app_id', 'in', accessibleAppIds);
-      usedInClause = true;
-    } else {
-      // For >10 apps, filter in memory
-      memoryFilters.app_ids = accessibleAppIds;
-    }
+  // Resolve requested app IDs from filters (singular app_id or plural app_ids)
+  let requestedAppIds: string[] | null = null;
+  if (filters.app_ids && filters.app_ids.length > 0) {
+    requestedAppIds = [...filters.app_ids];
   } else if (filters.app_id) {
-    // Admin filtering by specific app
-    query = query.where('app_id', '==', filters.app_id);
+    requestedAppIds = [filters.app_id];
+  }
+
+  // Intersect requested app IDs with access-controlled app IDs
+  let effectiveAppIds: string[] | null = null;
+  if (accessibleAppIds && requestedAppIds) {
+    effectiveAppIds = requestedAppIds.filter(id => accessibleAppIds.includes(id));
+    if (effectiveAppIds.length === 0) return { issues: [], total: 0 };
+  } else if (accessibleAppIds) {
+    effectiveAppIds = accessibleAppIds;
+  } else if (requestedAppIds) {
+    effectiveAppIds = requestedAppIds;
+  }
+
+  // Apply app filter to query
+  if (effectiveAppIds && effectiveAppIds.length === 1) {
+    query = query.where('app_id', '==', effectiveAppIds[0]);
+  } else if (effectiveAppIds && effectiveAppIds.length <= 10) {
+    query = query.where('app_id', 'in', effectiveAppIds);
+    usedInClause = true;
+  } else if (effectiveAppIds) {
+    memoryFilters.app_ids = effectiveAppIds;
   }
 
   // Apply environment filter (always equality, no 'in' needed)

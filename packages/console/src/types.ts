@@ -176,6 +176,7 @@ export interface Event {
 
 export interface IssueFilters {
   app_id?: string;
+  app_ids?: string[];
   environment?: Environment | '';
   status?: IssueStatus[];
   severity?: Severity[];

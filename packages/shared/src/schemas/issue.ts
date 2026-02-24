@@ -97,6 +97,7 @@ const commaSeparatedArray = <T extends z.ZodTypeAny>(schema: T) =>
 
 export const IssueFiltersSchema = z.object({
   app_id: z.string().optional(),
+  app_ids: commaSeparatedArray(z.string()),
   environment: EnvironmentSchema.optional(),
   status: commaSeparatedArray(IssueStatusSchema),
   severity: commaSeparatedArray(SeveritySchema),

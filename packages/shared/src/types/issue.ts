@@ -131,6 +131,7 @@ export interface IssueActionPayload {
  */
 export interface IssueFilters {
   app_id?: string;
+  app_ids?: string[];
   environment?: Environment;
   status?: IssueStatus | IssueStatus[];
   severity?: Severity | Severity[];
