@@ -490,7 +490,6 @@ router.post(
         const allUsers = await firestoreService.getAllUsers();
         const teamEmails = new Set(allUsers.map((u) => u.email.toLowerCase()));
         const reporterEmail = issue.reported_by?.email?.toLowerCase();
-        const authorEmail = user.email.toLowerCase();
 
         for (const email of mentions) {
           if (email === reporterEmail) {
