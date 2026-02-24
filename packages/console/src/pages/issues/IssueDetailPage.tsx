@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useIssue,
@@ -10,11 +10,21 @@ import {
   useIssueComments,
   useAddComment,
   useAttachmentUrl,
+  useUploadCommentImage,
 } from '../../hooks/useApi';
 import { useAuth } from '../../contexts/AuthContext';
 import type { IssueStatus, IssueType, Severity } from '../../types';
 
-const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'wont_fix'];
+// Allowed status transitions - mirrors @britepulse/shared ALLOWED_STATUS_TRANSITIONS
+const ALLOWED_STATUS_TRANSITIONS: Record<IssueStatus, IssueStatus[]> = {
+  new: ['triaged', 'in_progress', 'resolved', 'wont_fix'],
+  triaged: ['in_progress', 'blocked', 'snoozed', 'resolved', 'wont_fix'],
+  in_progress: ['blocked', 'snoozed', 'resolved', 'wont_fix'],
+  blocked: ['in_progress', 'resolved', 'wont_fix'],
+  snoozed: ['triaged', 'in_progress', 'resolved', 'wont_fix'],
+  resolved: ['triaged', 'in_progress'],
+  wont_fix: ['triaged', 'in_progress'],
+};
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3'];
 const ISSUE_TYPE_BUG: IssueType = 'bug';
 
@@ -77,11 +87,15 @@ export default function IssueDetailPage() {
   const { data: users } = useUsers();
   const { data: comments, isLoading: commentsLoading } = useIssueComments(issueId!);
   const addComment = useAddComment(issueId!);
+  const uploadImage = useUploadCommentImage(issueId!);
 
   const [activeTab, setActiveTab] = useState<'timeline' | 'events' | 'comments'>('timeline');
   const [commentText, setCommentText] = useState('');
   const [resolutionModal, setResolutionModal] = useState<{ status: IssueStatus } | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
+  const [resolutionError, setResolutionError] = useState<string | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<Array<{ id: string; url: string; filename: string }>>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // @mention state
   const [mentionQuery, setMentionQuery] = useState('');
@@ -217,19 +231,31 @@ export default function IssueDetailPage() {
     if (status === 'resolved' || status === 'wont_fix') {
       setResolutionModal({ status });
       setResolutionNote('');
+      setResolutionError(null);
       return;
     }
-    await updateStatus.mutateAsync({ status });
+    try {
+      await updateStatus.mutateAsync({ status });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update status';
+      alert(message);
+    }
   }
 
   async function handleResolutionSubmit() {
     if (!resolutionModal) return;
-    await updateStatus.mutateAsync({
-      status: resolutionModal.status,
-      resolution_note: resolutionNote || undefined,
-    });
-    setResolutionModal(null);
-    setResolutionNote('');
+    setResolutionError(null);
+    try {
+      await updateStatus.mutateAsync({
+        status: resolutionModal.status,
+        resolution_note: resolutionNote || undefined,
+      });
+      setResolutionModal(null);
+      setResolutionNote('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update status';
+      setResolutionError(message);
+    }
   }
 
   async function handleSeverityChange(severity: Severity) {
@@ -241,10 +267,58 @@ export default function IssueDetailPage() {
   }
 
   async function handleAddComment() {
-    if (!commentText.trim()) return;
-    await addComment.mutateAsync({ body: commentText.trim() });
+    if (!commentText.trim() && pendingAttachments.length === 0) return;
+    const attachment_ids = pendingAttachments.length > 0
+      ? pendingAttachments.map((a) => a.id)
+      : undefined;
+    await addComment.mutateAsync({
+      body: commentText.trim() || '(image attached)',
+      ...(attachment_ids && { attachment_ids }),
+    });
     setCommentText('');
+    setPendingAttachments([]);
     hasPrefilledRef.current = false;
+  }
+
+  const processImageFile = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      try {
+        const result = await uploadImage.mutateAsync({
+          data: base64,
+          filename: file.name || 'pasted-image.png',
+          content_type: file.type,
+        });
+        setPendingAttachments((prev) => [
+          ...prev,
+          { id: result.attachment_id, url: result.url, filename: result.filename },
+        ]);
+      } catch {
+        alert('Failed to upload image');
+      }
+    };
+    reader.readAsDataURL(file);
+  }, [uploadImage]);
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) processImageFile(file);
+        return;
+      }
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) processImageFile(file);
+    e.target.value = '';
   }
 
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
@@ -367,9 +441,12 @@ export default function IssueDetailPage() {
                 onChange={(e) => handleStatusChange(e.target.value as IssueStatus)}
                 disabled={updateStatus.isPending}
               >
-                {STATUSES.map((status) => (
+                <option value={issue.status}>
+                  {issue.status.replace(/_/g, ' ')}
+                </option>
+                {(ALLOWED_STATUS_TRANSITIONS[issue.status as IssueStatus] || []).map((status) => (
                   <option key={status} value={status}>
-                    {status.replace('_', ' ')}
+                    {status.replace(/_/g, ' ')}
                   </option>
                 ))}
               </select>
@@ -695,6 +772,13 @@ export default function IssueDetailPage() {
                         </span>
                       </div>
                       <p className="text-sm text-gray-700 whitespace-pre-wrap">{renderCommentBody(comment.body)}</p>
+                      {comment.attachment_refs && comment.attachment_refs.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {comment.attachment_refs.map((attachmentId) => (
+                            <AttachmentThumbnail key={attachmentId} attachmentId={attachmentId} />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -707,11 +791,12 @@ export default function IssueDetailPage() {
                     <textarea
                       ref={textareaRef}
                       className="input w-full h-20 resize-none"
-                      placeholder="Add a comment... Use @ to mention someone"
+                      placeholder="Add a comment... Use @ to mention someone. Paste images with Ctrl+V."
                       value={commentText}
                       onChange={handleCommentChange}
                       onKeyDown={handleMentionKeyDown}
                       onFocus={handleComposeFocus}
+                      onPaste={handlePaste}
                     />
                     {showMentionDropdown && filteredMentions.length > 0 && (
                       <div className="absolute left-0 right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-10">
@@ -744,11 +829,50 @@ export default function IssueDetailPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex justify-end mt-2">
+                  {pendingAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {pendingAttachments.map((att) => (
+                        <div key={att.id} className="relative group">
+                          <img
+                            src={att.url}
+                            alt={att.filename}
+                            className="h-16 w-auto rounded border border-gray-200"
+                          />
+                          <button
+                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => setPendingAttachments((prev) => prev.filter((a) => a.id !== att.id))}
+                            title="Remove"
+                          >
+                            x
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {uploadImage.isPending && (
+                    <div className="mt-2 text-sm text-gray-500">Uploading image...</div>
+                  )}
+                  <div className="flex items-center justify-between mt-2">
+                    <div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                      />
+                      <button
+                        className="text-sm text-gray-500 hover:text-gray-700"
+                        onClick={() => fileInputRef.current?.click()}
+                        type="button"
+                      >
+                        Attach image
+                      </button>
+                    </div>
                     <button
                       className="btn-primary"
                       onClick={handleAddComment}
-                      disabled={!commentText.trim() || addComment.isPending}
+                      disabled={(!commentText.trim() && pendingAttachments.length === 0) || addComment.isPending}
                     >
                       {addComment.isPending ? 'Sending...' : 'Send'}
                     </button>
@@ -776,6 +900,11 @@ export default function IssueDetailPage() {
               value={resolutionNote}
               onChange={(e) => setResolutionNote(e.target.value)}
             />
+            {resolutionError && (
+              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                {resolutionError}
+              </div>
+            )}
             <div className="flex justify-end gap-3 mt-4">
               <button
                 className="btn-secondary"

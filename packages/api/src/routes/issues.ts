@@ -17,9 +17,11 @@ import {
   logAuditAction,
 } from '../middleware/index.js';
 import * as firestoreService from '../services/firestore.js';
+import * as storageService from '../services/storage.js';
 import { generateContextFile, generateContextJSON } from '../services/context-generator.js';
 import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification, parseMentions, sendTeamMentionNotification } from '../services/email.js';
 import { config } from '../config.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const router: IRouter = Router();
 
@@ -465,6 +467,7 @@ router.post(
     }
 
     const mentions = parseMentions(body.trim());
+    const { attachment_ids } = req.body;
 
     const comment = await firestoreService.createComment(issue_id, {
       issue_id,
@@ -473,6 +476,7 @@ router.post(
       body: body.trim(),
       source: 'console',
       ...(mentions.length > 0 && { mentions }),
+      ...(Array.isArray(attachment_ids) && attachment_ids.length > 0 && { attachment_refs: attachment_ids }),
     });
 
     await logAuditAction(req, 'add_comment', 'issue', issue_id, {
@@ -507,6 +511,83 @@ router.post(
     }
 
     res.json({ data: comment });
+  })
+);
+
+/**
+ * POST /issues/:issue_id/comments/upload-image
+ * Upload an image attachment for use in a comment
+ */
+router.post(
+  '/:issue_id/comments/upload-image',
+  canChangeIssueStatus,
+  asyncHandler(async (req, res) => {
+    const { issue_id } = req.params;
+    const { data, filename, content_type } = req.body;
+
+    if (!data || !filename || !content_type) {
+      throw APIError.badRequest('data, filename, and content_type are required');
+    }
+
+    if (!storageService.isStorageConfigured()) {
+      throw APIError.internal('Storage not configured');
+    }
+
+    if (!storageService.isValidContentType(content_type)) {
+      throw APIError.badRequest(`Invalid content type: ${content_type}. Only images (JPEG, PNG, GIF, WebP) are allowed.`);
+    }
+
+    if (!storageService.isValidSize(data)) {
+      throw APIError.badRequest(`Image exceeds maximum size of ${config.attachmentMaxSizeMb}MB`);
+    }
+
+    const issue = await firestoreService.getIssue(issue_id);
+    if (!issue) {
+      throw APIError.notFound('Issue');
+    }
+
+    const accessibleAppIds = getAccessibleAppIds(req);
+    if (accessibleAppIds && !accessibleAppIds.includes(issue.app_id)) {
+      throw APIError.forbidden('Access to this issue is denied');
+    }
+
+    const attachmentId = uuidv4();
+    const storagePath = `attachments/${issue.app_id}/comments/${issue_id}/${attachmentId}.${filename.split('.').pop()?.toLowerCase() || 'bin'}`;
+
+    await storageService.uploadAttachment(storagePath, data, content_type);
+
+    // Remove data URL prefix for size calculation
+    const rawData = data.replace(/^data:[^;]+;base64,/, '');
+    const sizeBytes = Math.round((rawData.length * 3) / 4);
+
+    await firestoreService.createAttachment({
+      attachment_id: attachmentId,
+      issue_id: issue_id,
+      app_id: issue.app_id,
+      environment: issue.environment,
+      filename,
+      content_type,
+      size_bytes: sizeBytes,
+      storage_path: storagePath,
+      uploaded_at: new Date().toISOString(),
+      expires_at: storageService.calculateExpiresAt(),
+      user_opted_in: true,
+    });
+
+    const signedUrl = await storageService.generateSignedUrl(storagePath);
+
+    await logAuditAction(req, 'upload_comment_image', 'issue', issue_id, {
+      attachment_id: attachmentId,
+    });
+
+    res.json({
+      data: {
+        attachment_id: attachmentId,
+        url: signedUrl,
+        filename,
+        content_type,
+      },
+    });
   })
 );
 

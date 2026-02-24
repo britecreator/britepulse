@@ -111,7 +111,8 @@ export interface EventInput {
  */
 export interface Attachment {
   attachment_id: string;
-  event_id: string;
+  event_id?: string; // optional for comment attachments
+  issue_id?: string; // set for comment attachments
   app_id: string;
   environment: Environment;
   filename: string;

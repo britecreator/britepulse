@@ -173,6 +173,7 @@ export interface IssueComment {
   source: 'console' | 'email';
   created_at: string; // ISO timestamp
   mentions?: string[]; // email addresses @mentioned in body
+  attachment_refs?: string[]; // attachment IDs for uploaded images
 }
 
 /**

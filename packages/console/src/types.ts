@@ -4,7 +4,7 @@
  */
 
 export type Severity = 'P0' | 'P1' | 'P2' | 'P3';
-export type IssueStatus = 'new' | 'triaged' | 'in_progress' | 'resolved' | 'wont_fix';
+export type IssueStatus = 'new' | 'triaged' | 'in_progress' | 'blocked' | 'snoozed' | 'resolved' | 'wont_fix';
 export type Environment = 'prod' | 'stage' | 'dev';
 export type EventType = 'error' | 'feedback' | 'metric' | 'log';
 export type UserRole = 'Admin' | 'PO' | 'Engineer' | 'ReadOnly';

@@ -296,6 +296,7 @@ interface IssueComment {
   source: 'console' | 'email';
   created_at: string;
   mentions?: string[];
+  attachment_refs?: string[];
 }
 
 export function useIssueComments(issueId: string) {
@@ -312,7 +313,7 @@ export function useIssueComments(issueId: string) {
 export function useAddComment(issueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { body: string }) =>
+    mutationFn: (data: { body: string; attachment_ids?: string[] }) =>
       fetchApi<{ data: IssueComment }>(`/issues/${issueId}/comments`, {
         method: 'POST',
         body: JSON.stringify(data),
@@ -320,6 +321,19 @@ export function useAddComment(issueId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues', issueId, 'comments'] });
     },
+  });
+}
+
+export function useUploadCommentImage(issueId: string) {
+  return useMutation({
+    mutationFn: (data: { data: string; filename: string; content_type: string }) =>
+      fetchApi<{ data: { attachment_id: string; url: string; filename: string; content_type: string } }>(
+        `/issues/${issueId}/comments/upload-image`,
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }
+      ).then((r) => r.data),
   });
 }
 
