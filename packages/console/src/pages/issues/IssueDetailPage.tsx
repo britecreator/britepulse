@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useIssue,
@@ -280,7 +280,7 @@ export default function IssueDetailPage() {
     hasPrefilledRef.current = false;
   }
 
-  const processImageFile = useCallback(async (file: File) => {
+  async function processImageFile(file: File) {
     if (!file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = async () => {
@@ -300,7 +300,7 @@ export default function IssueDetailPage() {
       }
     };
     reader.readAsDataURL(file);
-  }, [uploadImage]);
+  }
 
   function handlePaste(e: React.ClipboardEvent) {
     const items = e.clipboardData?.items;
