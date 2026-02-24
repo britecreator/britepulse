@@ -115,7 +115,7 @@ describe('Email Service', () => {
   });
 
   describe('sendCommentNotification', () => {
-    it('should send comment email with reply-to address', async () => {
+    it('should send comment email to reporter', async () => {
       const issue = createMockIssue({
         issue_id: 'issue-abc-123',
         reported_by: { user_id: 'u1', email: 'reporter@test.com' },
@@ -139,8 +139,11 @@ describe('Email Service', () => {
       expect(msg.html).toContain('Can you share more details about the error?');
       expect(msg.text).toContain('Can you share more details about the error?');
 
-      // Reply-To should contain the issue ID
-      expect(msg.replyTo.email).toBe('issue+issue-abc-123@reply.test.britepulse.io');
+      // Should not include Reply-To (inbound email not configured)
+      expect(msg.replyTo).toBeUndefined();
+      // Should suggest forwarding to the commenter
+      expect(msg.html).toContain('forward this email');
+      expect(msg.text).toContain('forward this email');
     });
 
     it('should return error when no reporter email', async () => {
@@ -220,8 +223,8 @@ describe('Email Service', () => {
       expect(msg.html).toContain('please take a look');
       // Should include console link
       expect(msg.html).toContain('https://console.test.britepulse.io/issues/issue-abc');
-      // Should have replyTo for email replies
-      expect(msg.replyTo.email).toBe('issue+issue-abc@reply.test.britepulse.io');
+      // Should not include Reply-To (inbound email not configured)
+      expect(msg.replyTo).toBeUndefined();
     });
   });
 });

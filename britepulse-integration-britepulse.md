@@ -1,6 +1,6 @@
 # BritePulse Integration Guide for BritePulse
 
-## Quick Start
+## Step 1: Add the SDK
 
 Add this script tag to your HTML `<head>`:
 
@@ -13,10 +13,94 @@ Add this script tag to your HTML `<head>`:
 ></script>
 ```
 
-That's it! The SDK will automatically:
+The SDK will automatically:
 - Show a feedback button in the bottom-right corner
 - Capture uncaught JavaScript errors
+- Capture network errors (fetch/XHR 4xx/5xx responses)
 - Track user sessions
+
+**Next:** Complete Step 2 to identify users, otherwise all feedback shows as "anonymous".
+
+## Step 2: Identify Users (Required)
+
+Without this step, all feedback and errors will show as "anonymous" in the BritePulse console.
+
+```javascript
+// Helper functions - add to your app
+function setBritePulseUser(user) {
+  function trySetUser(attempts) {
+    if (attempts > 50) return; // Give up after 5 seconds
+    const instance = window.BritePulse?.getInstance();
+    if (instance) {
+      instance.setUser({
+        id: user.id,         // Required: unique identifier
+        email: user.email,   // Recommended: shows in "Reported By"
+        role: user.role      // Optional: "admin", "user", etc.
+      });
+    } else {
+      // SDK not ready yet, retry
+      setTimeout(() => trySetUser(attempts + 1), 100);
+    }
+  }
+  trySetUser(0);
+}
+
+function clearBritePulseUser() {
+  window.BritePulse?.getInstance()?.setUser(undefined);
+}
+```
+
+> **Timing matters:** The SDK loads with `defer`, so `getInstance()` may return `null` if called too early. Always use the retry pattern above.
+
+### Example: Vanilla JS with server-injected user
+
+```html
+<script>
+  // Assuming your server injects: window.AUTH_USER = { id: "...", email: "...", name: "..." }
+  if (window.AUTH_USER) {
+    setBritePulseUser({
+      id: window.AUTH_USER.id,
+      email: window.AUTH_USER.email
+    });
+  }
+</script>
+```
+
+### Example: Firebase Auth
+
+```javascript
+import { onAuthStateChanged } from 'firebase/auth';
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    setBritePulseUser({ id: user.uid, email: user.email });
+  } else {
+    clearBritePulseUser();
+  }
+});
+```
+
+### Example: React with useEffect
+
+```javascript
+useEffect(() => {
+  if (currentUser) {
+    setBritePulseUser({
+      id: currentUser.id,
+      email: currentUser.email
+    });
+  }
+  return () => clearBritePulseUser();
+}, [currentUser]);
+```
+
+## Common Pitfalls
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| Feedback shows "anonymous" | `setUser()` never called | Implement Step 2 |
+| `getInstance()` returns `null` | Called before SDK initialized | Use retry pattern (see Step 2) |
+| `setUser()` doesn't work | Called on `window.BritePulse` directly | Must call on `getInstance()` result |
 
 ## Configuration
 
@@ -44,6 +128,7 @@ declare global {
         version?: string;
         user?: { id?: string; role?: string; email?: string };
         captureErrors?: boolean;
+        captureNetworkErrors?: boolean;
         enableWidget?: boolean;
         widgetPosition?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
         widgetButtonText?: string;
@@ -90,51 +175,49 @@ function App() {
 
 ## Error Boundary (React)
 
-Capture React component errors:
+Wrap your app with the built-in ErrorBoundary to capture React component errors:
 
 ```tsx
-import { Component, ErrorInfo, ReactNode } from 'react';
+import { BritePulseErrorBoundary } from '@britepulse/sdk';
 
-interface Props { children: ReactNode; fallback?: ReactNode; }
-interface State { hasError: boolean; }
-
-export class ErrorBoundary extends Component<Props, State> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Use captureComponentError for React errors (includes component stack)
-    window.BritePulse?.getInstance()?.captureComponentError(
-      error,
-      errorInfo.componentStack || ''
-    );
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback || <div>Something went wrong</div>;
-    }
-    return this.props.children;
-  }
+// Basic usage - wrap your app or components
+function App() {
+  return (
+    <BritePulseErrorBoundary>
+      <YourApp />
+    </BritePulseErrorBoundary>
+  );
 }
+
+// With custom fallback UI
+<BritePulseErrorBoundary
+  fallback={<div>Something went wrong. Please refresh.</div>}
+>
+  <YourComponent />
+</BritePulseErrorBoundary>
+
+// With reset capability (let users retry)
+<BritePulseErrorBoundary
+  fallback={(error, resetError) => (
+    <div>
+      <p>Error: {error.message}</p>
+      <button onClick={resetError}>Try Again</button>
+    </div>
+  )}
+>
+  <YourComponent />
+</BritePulseErrorBoundary>
 ```
+
+Props:
+- `children`: Components to wrap
+- `fallback`: ReactNode or function `(error, resetError) => ReactNode`
+- `onError`: Optional callback when error occurs
+- `reportError`: Whether to send to BritePulse (default: true)
 
 ## API Methods
 
 ```typescript
-// Set user context after login
-window.BritePulse?.getInstance()?.setUser({
-  id: user.id,
-  email: user.email,
-  role: user.role,  // optional
-});
-
-// Clear user on logout
-window.BritePulse?.getInstance()?.setUser(undefined);
-
 // Manual error capture with metadata
 window.BritePulse?.captureError(error, {
   context: 'checkout',
@@ -150,10 +233,10 @@ window.BritePulse?.openWidget();
 The feedback widget supports image attachments for visual context (screenshots, error states, etc.).
 
 ### Widget Usage
-- Click the **📎 Attach Image** button in the feedback widget
+- Click the **Attach Image** button in the feedback widget
 - Supported: JPEG, PNG, GIF, WebP (max 5MB)
 - A thumbnail preview shows before submission
-- Attachments appear in the Console under Issues → Events tab
+- Attachments appear in the Console under Issues > Events tab
 
 ### Programmatic Attachment
 

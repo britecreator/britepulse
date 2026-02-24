@@ -375,9 +375,6 @@ export async function sendCommentNotification(
   const safeBody = escapeHtml(comment.body);
   const safeAuthor = escapeHtml(comment.author_name || comment.author_email);
 
-  // Reply-to address encodes the issue ID for inbound parse routing
-  const replyToAddress = `issue+${issue.issue_id}@${config.inboundEmailDomain || 'reply.britepulse.io'}`;
-
   const html = `
 <!DOCTYPE html>
 <html>
@@ -408,7 +405,7 @@ export async function sendCommentNotification(
       </div>
     </div>
 
-    <p>You can reply directly to this email to add a comment back.</p>
+    <p style="font-size: 14px; color: #6b7280;">To respond, you can forward this email to <strong>${safeAuthor}</strong> with your reply.</p>
 
     <p style="margin-bottom: 0; color: #6b7280; font-size: 14px;">
       — The ${safeAppName} Team
@@ -434,7 +431,7 @@ ${issueTypeLabel}: ${issue.title}
 ${comment.author_name || comment.author_email} commented:
 ${comment.body}
 
-You can reply directly to this email to add a comment back.
+To respond, you can forward this email to ${comment.author_name || comment.author_email} with your reply.
 
 — The ${app.name} Team
 
@@ -448,10 +445,6 @@ Powered by BritePulse
       from: {
         email: config.sendgridFromEmail,
         name: app.name,
-      },
-      replyTo: {
-        email: replyToAddress,
-        name: `${app.name} Issue Discussion`,
       },
       subject: `Re: Your ${issueTypeLabel} - ${issue.title}`,
       text,
@@ -520,7 +513,6 @@ export async function sendTeamMentionNotification(
   const safeBody = escapeHtml(comment.body);
   const safeAuthor = escapeHtml(comment.author_name || comment.author_email);
   const consoleUrl = `${config.consoleBaseUrl}/issues/${issue.issue_id}`;
-  const replyToAddress = `issue+${issue.issue_id}@${config.inboundEmailDomain || 'reply.britepulse.io'}`;
 
   const html = `
 <!DOCTYPE html>
@@ -552,7 +544,7 @@ export async function sendTeamMentionNotification(
       </div>
     </div>
 
-    <p>You can reply directly to this email to add a comment, or <a href="${consoleUrl}" style="color: #2563eb; text-decoration: underline;">view this issue in the BritePulse console</a>.</p>
+    <p><a href="${consoleUrl}" style="color: #2563eb; text-decoration: underline;">View this issue in the BritePulse console</a></p>
 
     <p style="margin-bottom: 0; color: #6b7280; font-size: 14px;">
       — The ${safeAppName} Team
@@ -578,7 +570,7 @@ ${issueTypeLabel}: ${issue.title}
 ${comment.author_name || comment.author_email} commented:
 ${comment.body}
 
-You can reply directly to this email to add a comment, or view this issue in the BritePulse console: ${consoleUrl}
+View this issue in the BritePulse console: ${consoleUrl}
 
 — The ${app.name} Team
 
@@ -592,10 +584,6 @@ Powered by BritePulse
       from: {
         email: config.sendgridFromEmail,
         name: app.name,
-      },
-      replyTo: {
-        email: replyToAddress,
-        name: `${app.name} Issue Discussion`,
       },
       subject: `You were mentioned: ${issue.title}`,
       text,
