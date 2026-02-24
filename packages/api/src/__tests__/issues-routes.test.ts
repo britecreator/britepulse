@@ -436,7 +436,7 @@ describe('Issue Routes', () => {
       expect(emailService.sendTeamMentionNotification).not.toHaveBeenCalled();
     });
 
-    it('should not send email for self-mention', async () => {
+    it('should send email for self-mention', async () => {
       const issue = createMockIssue({
         issue_id: 'issue-1',
         reported_by: { user_id: 'u1', email: 'reporter@test.com' },
@@ -453,9 +453,10 @@ describe('Issue Routes', () => {
         .post('/issues/issue-1/comments')
         .send({ body: '@admin@test.com reminder for myself' });
 
-      // Author is admin@test.com, mention is admin@test.com — should skip
-      expect(emailService.sendCommentNotification).not.toHaveBeenCalled();
-      expect(emailService.sendTeamMentionNotification).not.toHaveBeenCalled();
+      // Author is admin@test.com, mention is admin@test.com — should still send
+      expect(emailService.sendTeamMentionNotification).toHaveBeenCalledWith(
+        issue, expect.anything(), expect.anything(), 'admin@test.com'
+      );
     });
 
     it('should reject empty comment body', async () => {

@@ -493,9 +493,6 @@ router.post(
         const authorEmail = user.email.toLowerCase();
 
         for (const email of mentions) {
-          // Skip self-mentions
-          if (email === authorEmail) continue;
-
           if (email === reporterEmail) {
             sendCommentNotification(issue, app, comment).catch((err) => {
               console.error('[Issues] Failed to send comment notification to reporter:', err);

@@ -868,6 +868,7 @@ export default function IssueDetailPage() {
                       >
                         Attach image
                       </button>
+                      <span className="text-xs text-gray-400">or paste a screenshot</span>
                     </div>
                     <button
                       className="btn-primary"

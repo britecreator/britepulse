@@ -77,6 +77,38 @@ export function Widget({ config, onSubmit }: WidgetProps) {
     }
   }, []);
 
+  const handlePaste = useCallback((e: ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        setAttachmentError(null);
+
+        if (!ALLOWED_TYPES.includes(file.type)) {
+          setAttachmentError('Please select an image file (JPEG, PNG, GIF, or WebP)');
+          return;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+          setAttachmentError('Image must be less than 5MB');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          setAttachment({
+            file: new File([file], file.name || 'pasted-image.png', { type: file.type }),
+            preview: reader.result as string,
+          });
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     if (!description.trim()) return;
 
@@ -211,6 +243,7 @@ export function Widget({ config, onSubmit }: WidgetProps) {
                 <textarea
                   value={description}
                   onInput={(e) => setDescription((e.target as HTMLTextAreaElement).value)}
+                  onPaste={handlePaste}
                   placeholder={
                     category === 'bug'
                       ? "What's the issue?"
@@ -226,6 +259,7 @@ export function Widget({ config, onSubmit }: WidgetProps) {
                   <textarea
                     value={steps}
                     onInput={(e) => setSteps((e.target as HTMLTextAreaElement).value)}
+                    onPaste={handlePaste}
                     placeholder="Steps to reproduce (optional)"
                     style={{ ...styles.textarea, minHeight: '60px' }}
                   />
@@ -256,13 +290,16 @@ export function Widget({ config, onSubmit }: WidgetProps) {
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      style={styles.attachmentButton}
-                      type="button"
-                    >
-                      📎 Attach image
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        style={styles.attachmentButton}
+                        type="button"
+                      >
+                        📎 Attach image
+                      </button>
+                      <span style={{ fontSize: '12px', color: '#9CA3AF' }}>or paste a screenshot</span>
+                    </div>
                   )}
                   {attachmentError && (
                     <p style={styles.attachmentError}>{attachmentError}</p>
