@@ -19,7 +19,7 @@ import {
 import * as firestoreService from '../services/firestore.js';
 import * as storageService from '../services/storage.js';
 import { generateContextFile, generateContextJSON } from '../services/context-generator.js';
-import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification, parseMentions, sendTeamMentionNotification } from '../services/email.js';
+import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification, parseMentions, sendTeamMentionNotification, type CommentAttachmentUrl } from '../services/email.js';
 import { config } from '../config.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -491,13 +491,31 @@ router.post(
         const teamEmails = new Set(allUsers.map((u) => u.email.toLowerCase()));
         const reporterEmail = issue.reported_by?.email?.toLowerCase();
 
+        // Resolve attachment signed URLs for email (7-day expiry)
+        let attachmentUrls: CommentAttachmentUrl[] | undefined;
+        if (comment.attachment_refs && comment.attachment_refs.length > 0 && storageService.isStorageConfigured()) {
+          attachmentUrls = [];
+          for (const attachmentId of comment.attachment_refs) {
+            try {
+              const att = await firestoreService.getAttachment(attachmentId);
+              if (att) {
+                const url = await storageService.generateSignedUrl(att.storage_path, 10080); // 7 days
+                attachmentUrls.push({ filename: att.filename, url });
+              }
+            } catch (err) {
+              console.error('[Issues] Failed to resolve attachment URL for email:', err);
+            }
+          }
+          if (attachmentUrls.length === 0) attachmentUrls = undefined;
+        }
+
         for (const email of mentions) {
           if (email === reporterEmail) {
-            sendCommentNotification(issue, app, comment).catch((err) => {
+            sendCommentNotification(issue, app, comment, attachmentUrls).catch((err) => {
               console.error('[Issues] Failed to send comment notification to reporter:', err);
             });
           } else if (teamEmails.has(email)) {
-            sendTeamMentionNotification(issue, app, comment, email).catch((err) => {
+            sendTeamMentionNotification(issue, app, comment, email, attachmentUrls).catch((err) => {
               console.error('[Issues] Failed to send mention notification:', err);
             });
           }

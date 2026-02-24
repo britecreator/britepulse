@@ -7,6 +7,11 @@ import sgMail from '@sendgrid/mail';
 import { config } from '../config.js';
 import type { Issue, App, IssueComment } from '@britepulse/shared';
 
+export interface CommentAttachmentUrl {
+  filename: string;
+  url: string;
+}
+
 let isConfigured = false;
 
 /**
@@ -356,7 +361,8 @@ export async function sendResolvedNotification(
 export async function sendCommentNotification(
   issue: Issue,
   app: App,
-  comment: IssueComment
+  comment: IssueComment,
+  attachmentUrls?: CommentAttachmentUrl[]
 ): Promise<SendResult> {
   if (!issue.reported_by?.email) {
     return { success: false, error: 'No reporter email available' };
@@ -374,6 +380,16 @@ export async function sendCommentNotification(
   const safeTitle = escapeHtml(issue.title);
   const safeBody = escapeHtml(comment.body);
   const safeAuthor = escapeHtml(comment.author_name || comment.author_email);
+
+  const attachmentHtml = attachmentUrls && attachmentUrls.length > 0
+    ? `<div style="margin-top: 12px;">${attachmentUrls.map((a) =>
+        `<img src="${escapeHtml(a.url)}" alt="${escapeHtml(a.filename)}" style="max-width: 100%; height: auto; border-radius: 6px; border: 1px solid #e5e7eb; margin-top: 8px; display: block;" />`
+      ).join('')}</div>`
+    : '';
+
+  const attachmentText = attachmentUrls && attachmentUrls.length > 0
+    ? '\n\nAttached images:\n' + attachmentUrls.map((a) => `- ${a.filename}: ${a.url}`).join('\n')
+    : '';
 
   const html = `
 <!DOCTYPE html>
@@ -402,6 +418,7 @@ export async function sendCommentNotification(
           <strong>${safeAuthor}</strong> commented:
         </p>
         <p style="margin: 0; color: #111827; font-size: 14px; white-space: pre-wrap;">${safeBody}</p>
+        ${attachmentHtml}
       </div>
     </div>
 
@@ -429,7 +446,7 @@ There's a new comment on your ${issueTypeLabel.toLowerCase()} for ${app.name}:
 ${issueTypeLabel}: ${issue.title}
 
 ${comment.author_name || comment.author_email} commented:
-${comment.body}
+${comment.body}${attachmentText}
 
 To respond, you can forward this email to ${comment.author_name || comment.author_email} with your reply.
 
@@ -498,7 +515,8 @@ export async function sendTeamMentionNotification(
   issue: Issue,
   app: App,
   comment: IssueComment,
-  recipientEmail: string
+  recipientEmail: string,
+  attachmentUrls?: CommentAttachmentUrl[]
 ): Promise<SendResult> {
   if (!ensureConfigured()) {
     return { success: false, error: 'SendGrid not configured' };
@@ -513,6 +531,16 @@ export async function sendTeamMentionNotification(
   const safeBody = escapeHtml(comment.body);
   const safeAuthor = escapeHtml(comment.author_name || comment.author_email);
   const consoleUrl = `${config.consoleBaseUrl}/issues/${issue.issue_id}`;
+
+  const attachmentHtml = attachmentUrls && attachmentUrls.length > 0
+    ? `<div style="margin-top: 12px;">${attachmentUrls.map((a) =>
+        `<img src="${escapeHtml(a.url)}" alt="${escapeHtml(a.filename)}" style="max-width: 100%; height: auto; border-radius: 6px; border: 1px solid #e5e7eb; margin-top: 8px; display: block;" />`
+      ).join('')}</div>`
+    : '';
+
+  const attachmentText = attachmentUrls && attachmentUrls.length > 0
+    ? '\n\nAttached images:\n' + attachmentUrls.map((a) => `- ${a.filename}: ${a.url}`).join('\n')
+    : '';
 
   const html = `
 <!DOCTYPE html>
@@ -541,6 +569,7 @@ export async function sendTeamMentionNotification(
           <strong>${safeAuthor}</strong> commented:
         </p>
         <p style="margin: 0; color: #111827; font-size: 14px; white-space: pre-wrap;">${safeBody}</p>
+        ${attachmentHtml}
       </div>
     </div>
 
@@ -568,7 +597,7 @@ You were mentioned in a comment on a ${issueTypeLabel.toLowerCase()} for ${app.n
 ${issueTypeLabel}: ${issue.title}
 
 ${comment.author_name || comment.author_email} commented:
-${comment.body}
+${comment.body}${attachmentText}
 
 View this issue in the BritePulse console: ${consoleUrl}
 

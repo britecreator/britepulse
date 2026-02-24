@@ -381,7 +381,8 @@ describe('Issue Routes', () => {
       expect(emailService.sendCommentNotification).toHaveBeenCalledWith(
         issue,
         expect.anything(),
-        newComment
+        newComment,
+        undefined
       );
     });
 
@@ -413,7 +414,8 @@ describe('Issue Routes', () => {
         issue,
         expect.anything(),
         newComment,
-        'engineer@test.com'
+        'engineer@test.com',
+        undefined
       );
       // Reporter should NOT be emailed (not mentioned)
       expect(emailService.sendCommentNotification).not.toHaveBeenCalled();
@@ -455,7 +457,7 @@ describe('Issue Routes', () => {
 
       // Author is admin@test.com, mention is admin@test.com — should still send
       expect(emailService.sendTeamMentionNotification).toHaveBeenCalledWith(
-        issue, expect.anything(), expect.anything(), 'admin@test.com'
+        issue, expect.anything(), expect.anything(), 'admin@test.com', undefined
       );
     });
 
