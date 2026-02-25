@@ -11,3 +11,4 @@ export { default as usersRoutes } from './users.js';
 export { default as briefsRoutes } from './briefs.js';
 export { default as attachmentsRoutes } from './attachments.js';
 export { default as inboundEmailRoutes } from './inbound-email.js';
+export { default as notificationsRoutes } from './notifications.js';

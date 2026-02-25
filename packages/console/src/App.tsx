@@ -9,6 +9,7 @@ import AppDetailPage from './pages/admin/AppDetailPage';
 import UsersPage from './pages/admin/UsersPage';
 import IssuesListPage from './pages/issues/IssuesListPage';
 import IssueDetailPage from './pages/issues/IssueDetailPage';
+import NotificationsPage from './pages/NotificationsPage';
 
 // BritePulse SDK type declaration
 declare global {
@@ -109,6 +110,9 @@ export default function App() {
         {/* Issue routes (PO and above) */}
         <Route path="issues" element={<IssuesListPage />} />
         <Route path="issues/:issueId" element={<IssueDetailPage />} />
+
+        {/* Notifications */}
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

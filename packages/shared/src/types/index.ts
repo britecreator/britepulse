@@ -15,3 +15,4 @@ export * from './audit.js';
 export * from './user.js';
 export * from './daily-brief.js';
 export * from './api.js';
+export * from './notification.js';

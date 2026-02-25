@@ -14,8 +14,9 @@ vi.mock('../services/firestore.js', () => ({
   getApp: vi.fn(),
   getEventsByIssue: vi.fn(),
   createComment: vi.fn(),
-  getComments: vi.fn(),
+  getComments: vi.fn().mockResolvedValue([]),
   getAllUsers: vi.fn().mockResolvedValue([]),
+  createNotifications: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock email service - parseMentions uses real implementation

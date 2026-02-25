@@ -4,7 +4,7 @@
  */
 
 import { Router, type IRouter } from 'express';
-import { schemas, ALLOWED_STATUS_TRANSITIONS, type IssueStatus } from '@britepulse/shared';
+import { schemas, ALLOWED_STATUS_TRANSITIONS, type IssueStatus, type Notification } from '@britepulse/shared';
 import {
   asyncHandler,
   APIError,
@@ -484,11 +484,12 @@ router.post(
     });
 
     // Send email notifications to @mentioned users
+    const allUsers = mentions.length > 0 ? await firestoreService.getAllUsers() : [];
+    const teamEmails = new Set(allUsers.map((u) => u.email.toLowerCase()));
+
     if (mentions.length > 0) {
       const app = await firestoreService.getApp(issue.app_id);
       if (app) {
-        const allUsers = await firestoreService.getAllUsers();
-        const teamEmails = new Set(allUsers.map((u) => u.email.toLowerCase()));
         const reporterEmail = issue.reported_by?.email?.toLowerCase();
 
         // Resolve attachment signed URLs for email (7-day expiry)
@@ -522,6 +523,62 @@ router.post(
           // Unknown emails are silently skipped
         }
       }
+    }
+
+    // Create in-app notifications
+    const authorEmail = user.email.toLowerCase();
+    const bodyPreview = comment.body.trim().substring(0, 120);
+    const notificationsToCreate: Array<Omit<Notification, 'notification_id' | 'created_at' | 'read'>> = [];
+
+    // 1. Notify @mentioned team members (not the author)
+    for (const email of mentions) {
+      if (email === authorEmail) continue;
+      if (teamEmails.has(email)) {
+        notificationsToCreate.push({
+          recipient_email: email,
+          type: 'mention',
+          issue_id,
+          issue_title: issue.title,
+          app_id: issue.app_id,
+          comment_id: comment.comment_id,
+          actor_email: user.email,
+          actor_name: user.name,
+          body_preview: bodyPreview,
+        });
+      }
+    }
+
+    // 2. Notify thread participants (previous console commenters, excluding author and already-mentioned)
+    const existingComments = await firestoreService.getComments(issue_id);
+    const threadParticipants = new Set<string>();
+    for (const c of existingComments) {
+      if (c.comment_id === comment.comment_id) continue;
+      if (c.source === 'console') {
+        threadParticipants.add(c.author_email.toLowerCase());
+      }
+    }
+    threadParticipants.delete(authorEmail);
+    for (const email of mentions) {
+      threadParticipants.delete(email);
+    }
+    for (const participantEmail of threadParticipants) {
+      notificationsToCreate.push({
+        recipient_email: participantEmail,
+        type: 'comment_on_thread',
+        issue_id,
+        issue_title: issue.title,
+        app_id: issue.app_id,
+        comment_id: comment.comment_id,
+        actor_email: user.email,
+        actor_name: user.name,
+        body_preview: bodyPreview,
+      });
+    }
+
+    if (notificationsToCreate.length > 0) {
+      firestoreService.createNotifications(notificationsToCreate).catch((err) => {
+        console.error('[Issues] Failed to create in-app notifications:', err);
+      });
     }
 
     res.json({ data: comment });

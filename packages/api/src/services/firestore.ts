@@ -22,6 +22,8 @@ import type {
   InstallKeys,
   Attachment,
   IssueComment,
+  Notification,
+  NotificationType,
 } from '@britepulse/shared';
 
 // Initialize Firebase Admin
@@ -67,6 +69,7 @@ const COLLECTIONS = {
   auditLogs: 'audit_logs',
   users: 'users',
   attachments: 'attachments',
+  notifications: 'notifications',
 } as const;
 
 // ============ App Operations ============
@@ -948,4 +951,116 @@ export async function deleteAttachmentsByEventId(eventId: string): Promise<numbe
   await batch.commit();
 
   return snapshot.docs.length;
+}
+
+// ============ Notification Operations ============
+
+export async function createNotifications(
+  notifications: Array<Omit<Notification, 'notification_id' | 'created_at' | 'read'>>
+): Promise<Notification[]> {
+  if (notifications.length === 0) return [];
+  const firestore = getFirestore();
+  const batch = firestore.batch();
+  const now = new Date().toISOString();
+  const results: Notification[] = [];
+
+  for (const notification of notifications) {
+    const notificationId = uuidv4();
+    const doc: Notification = {
+      ...notification,
+      notification_id: notificationId,
+      read: false,
+      created_at: now,
+    };
+    batch.set(firestore.collection(COLLECTIONS.notifications).doc(notificationId), doc);
+    results.push(doc);
+  }
+
+  await batch.commit();
+  return results;
+}
+
+export async function getNotifications(
+  recipientEmail: string,
+  options: { type?: NotificationType; appIds?: string[]; limit?: number } = {}
+): Promise<{ notifications: Notification[]; total_unread: number }> {
+  const firestore = getFirestore();
+  const { type, appIds, limit = 50 } = options;
+
+  // Get unread count (always needed for badge)
+  const unreadSnap = await firestore
+    .collection(COLLECTIONS.notifications)
+    .where('recipient_email', '==', recipientEmail)
+    .where('read', '==', false)
+    .get();
+  const total_unread = unreadSnap.size;
+
+  // Build list query
+  let query: FirebaseFirestore.Query = firestore
+    .collection(COLLECTIONS.notifications)
+    .where('recipient_email', '==', recipientEmail);
+
+  // Firestore only allows one 'in' clause, so we may need memory filtering for large app_id lists
+  let memoryFilterAppIds: string[] | undefined;
+
+  if (type) {
+    query = query.where('type', '==', type);
+  }
+
+  if (appIds && appIds.length > 0) {
+    if (appIds.length <= 10) {
+      query = query.where('app_id', 'in', appIds);
+    } else {
+      memoryFilterAppIds = appIds;
+    }
+  }
+
+  query = query.orderBy('created_at', 'desc').limit(memoryFilterAppIds ? 200 : limit);
+
+  const snapshot = await query.get();
+  let notifications = snapshot.docs.map((doc) => doc.data() as Notification);
+
+  if (memoryFilterAppIds) {
+    const appIdSet = new Set(memoryFilterAppIds);
+    notifications = notifications.filter((n) => appIdSet.has(n.app_id));
+    notifications = notifications.slice(0, limit);
+  }
+
+  return { notifications, total_unread };
+}
+
+export async function getUnreadNotificationCount(recipientEmail: string): Promise<number> {
+  const firestore = getFirestore();
+  const snapshot = await firestore
+    .collection(COLLECTIONS.notifications)
+    .where('recipient_email', '==', recipientEmail)
+    .where('read', '==', false)
+    .get();
+  return snapshot.size;
+}
+
+export async function markNotificationRead(notificationId: string): Promise<boolean> {
+  const firestore = getFirestore();
+  const docRef = firestore.collection(COLLECTIONS.notifications).doc(notificationId);
+  const doc = await docRef.get();
+  if (!doc.exists) return false;
+  await docRef.update({ read: true });
+  return true;
+}
+
+export async function markAllNotificationsRead(recipientEmail: string): Promise<number> {
+  const firestore = getFirestore();
+  const snapshot = await firestore
+    .collection(COLLECTIONS.notifications)
+    .where('recipient_email', '==', recipientEmail)
+    .where('read', '==', false)
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const batch = firestore.batch();
+  snapshot.docs.forEach((doc) => batch.update(doc.ref, { read: true }));
+  await batch.commit();
+
+  return snapshot.size;
 }

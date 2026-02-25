@@ -25,6 +25,7 @@ import {
   briefsRoutes,
   attachmentsRoutes,
   inboundEmailRoutes,
+  notificationsRoutes,
 } from './routes/index.js';
 
 // Validate configuration
@@ -145,6 +146,7 @@ app.use('/issues', issuesRoutes);
 app.use('/briefs', briefsRoutes);
 app.use('/attachments', attachmentsRoutes);
 app.use('/webhooks/inbound-email', inboundEmailRoutes);
+app.use('/notifications', notificationsRoutes);
 
 // 404 handler
 app.use((_req, res) => {

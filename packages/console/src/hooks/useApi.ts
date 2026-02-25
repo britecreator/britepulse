@@ -6,6 +6,7 @@ import type {
   Event,
   IssueStatus,
   Severity,
+  Notification,
 } from '../types';
 
 // API base URL - use VITE_API_URL in production, localhost in dev
@@ -412,4 +413,58 @@ export function useAttachmentUrl(attachmentId: string | undefined) {
 export function getAttachmentRedirectUrl(attachmentId: string): string {
   const token = localStorage.getItem(TOKEN_KEY);
   return `${API_BASE}/attachments/${attachmentId}/redirect?token=${encodeURIComponent(token || '')}`;
+}
+
+// Notifications
+export function useNotifications(options?: { type?: string; appIds?: string[] }) {
+  return useQuery({
+    queryKey: ['notifications', options],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (options?.type) params.set('type', options.type);
+      if (options?.appIds?.length) params.set('app_ids', options.appIds.join(','));
+      return fetchApi<{ data: Notification[]; unread_count: number }>(
+        `/notifications?${params}`
+      ).then((r) => ({ notifications: r.data, unread_count: r.unread_count }));
+    },
+    refetchInterval: 30_000,
+  });
+}
+
+export function useUnreadNotificationCount() {
+  return useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: () =>
+      fetchApi<{ data: { count: number } }>('/notifications/unread-count').then(
+        (r) => r.data.count
+      ),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (notificationId: string) =>
+      fetchApi<{ data: { success: boolean } }>(
+        `/notifications/${notificationId}/read`,
+        { method: 'POST' }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      fetchApi<{ data: { marked: number } }>('/notifications/mark-all-read', {
+        method: 'POST',
+      }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
 }

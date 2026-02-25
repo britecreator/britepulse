@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useUnreadNotificationCount } from '../hooks/useApi';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Issues', href: '/issues', icon: ExclamationIcon },
+  { name: 'Notifications', href: '/notifications', icon: BellIcon },
   { name: 'Apps', href: '/admin/apps', icon: CubeIcon, roles: ['Admin', 'PO'] },
   { name: 'Users', href: '/admin/users', icon: UsersIcon, roles: ['Admin'] },
 ];
@@ -41,6 +43,14 @@ function UsersIcon({ className }: { className?: string }) {
   );
 }
 
+function BellIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    </svg>
+  );
+}
+
 function MenuIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -60,6 +70,7 @@ function XIcon({ className }: { className?: string }) {
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout, hasRole } = useAuth();
+  const { data: unreadCount } = useUnreadNotificationCount();
 
   const filteredNavigation = navigation.filter(
     (item) => !item.roles || item.roles.some((role) => hasRole(role as 'Admin' | 'PO' | 'Engineer' | 'ReadOnly'))
@@ -97,6 +108,11 @@ export default function Layout() {
                 >
                   <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
                   {item.name}
+                  {item.name === 'Notifications' && !!unreadCount && unreadCount > 0 && (
+                    <span className="ml-auto inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </nav>
@@ -126,6 +142,11 @@ export default function Layout() {
               >
                 <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
                 {item.name}
+                {item.name === 'Notifications' && !!unreadCount && unreadCount > 0 && (
+                  <span className="ml-auto inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
