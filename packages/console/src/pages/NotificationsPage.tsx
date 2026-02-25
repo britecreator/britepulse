@@ -42,7 +42,7 @@ export default function NotificationsPage() {
     return opts;
   }, [filterMode, myAppIds]);
 
-  const { data, isLoading } = useNotifications(queryOptions);
+  const { data, isLoading, error } = useNotifications(queryOptions);
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
 
@@ -96,7 +96,11 @@ export default function NotificationsPage() {
       </div>
 
       {/* Notification list */}
-      {isLoading ? (
+      {error ? (
+        <div className="text-center py-12">
+          <p className="text-red-600 text-sm">Failed to load notifications. Please try again.</p>
+        </div>
+      ) : isLoading ? (
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
         </div>

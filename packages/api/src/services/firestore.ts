@@ -1015,16 +1015,17 @@ export async function getNotifications(
     }
   }
 
-  query = query.orderBy('created_at', 'desc').limit(memoryFilterAppIds ? 200 : limit);
-
   const snapshot = await query.get();
   let notifications = snapshot.docs.map((doc) => doc.data() as Notification);
 
   if (memoryFilterAppIds) {
     const appIdSet = new Set(memoryFilterAppIds);
     notifications = notifications.filter((n) => appIdSet.has(n.app_id));
-    notifications = notifications.slice(0, limit);
   }
+
+  // Sort in memory (avoids requiring a Firestore composite index)
+  notifications.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  notifications = notifications.slice(0, limit);
 
   return { notifications, total_unread };
 }
