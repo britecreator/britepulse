@@ -727,7 +727,26 @@ router.get(
       throw APIError.notFound('App');
     }
 
-    const contextData = { issue, events, app };
+    // Fetch attachment metadata and generate signed URLs for events with attachments
+    let attachmentUrls: import('../services/context-generator.js').AttachmentUrl[] = [];
+    const eventIdsWithAttachments = events
+      .filter((e) => e.attachment_refs && e.attachment_refs.length > 0)
+      .map((e) => e.event_id);
+
+    if (eventIdsWithAttachments.length > 0 && storageService.isStorageConfigured()) {
+      const attachments = await firestoreService.getAttachmentsByEventIds(eventIdsWithAttachments);
+      attachmentUrls = await Promise.all(
+        attachments.map(async (att) => ({
+          attachment_id: att.attachment_id,
+          event_id: att.event_id ?? '',
+          filename: att.filename,
+          // 24-hour signed URLs so AI agents have time to use the downloaded context file
+          url: await storageService.generateSignedUrl(att.storage_path, 1440),
+        }))
+      );
+    }
+
+    const contextData = { issue, events, app, attachmentUrls };
 
     // Log context download
     await logAuditAction(req, 'download_context', 'issue', issue_id, {

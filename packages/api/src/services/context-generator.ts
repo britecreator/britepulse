@@ -23,10 +23,18 @@ function isFeedbackIssue(issue: Issue): boolean {
   return issue.issue_type === 'feedback' || issue.issue_type === 'feature' || issue.issue_type === 'question';
 }
 
+export interface AttachmentUrl {
+  attachment_id: string;
+  event_id: string;
+  filename: string;
+  url: string;
+}
+
 export interface ContextFileData {
   issue: Issue;
   events: Event[];
   app: App;
+  attachmentUrls?: AttachmentUrl[];
 }
 
 /**
@@ -125,7 +133,17 @@ export function generateContextFile(data: ContextFileData): string {
     lines.push('## Attachments');
     lines.push(`This issue includes ${eventsWithAttachments.length} event(s) with image attachments.`);
     lines.push('Screenshots or images were provided by users to help illustrate the issue.');
-    lines.push('View attachments in the BritePulse console under the Events tab.');
+    lines.push('');
+
+    if (data.attachmentUrls && data.attachmentUrls.length > 0) {
+      lines.push('> Note: Image URLs are time-limited signed links valid for 24 hours.');
+      lines.push('');
+      data.attachmentUrls.forEach((att) => {
+        lines.push(`![${att.filename}](${att.url})`);
+      });
+    } else {
+      lines.push('View attachments in the BritePulse console under the Events tab.');
+    }
     lines.push('');
   }
 
@@ -403,12 +421,22 @@ export function generateContextJSON(data: ContextFileData): object {
   // Include instruction type hint
   result.instruction_type = isFeedbackIssue(issue) ? 'feature_request' : 'bug_fix';
 
-  // Include attachment count if any events have attachments
+  // Include attachments if any events have attachments
   const eventsWithAttachments = events.filter((e) => e.attachment_refs && e.attachment_refs.length > 0);
   if (eventsWithAttachments.length > 0) {
     result.attachments = {
       events_with_attachments: eventsWithAttachments.length,
-      note: 'Image attachments are available in the BritePulse console under the Events tab',
+      ...(data.attachmentUrls && data.attachmentUrls.length > 0
+        ? {
+            images: data.attachmentUrls.map((att) => ({
+              attachment_id: att.attachment_id,
+              event_id: att.event_id,
+              filename: att.filename,
+              url: att.url,
+              url_note: 'Time-limited signed URL valid for 24 hours',
+            })),
+          }
+        : { note: 'Image attachments are available in the BritePulse console under the Events tab' }),
     };
   }
 

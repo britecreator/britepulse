@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { createMockIssue, createMockApp, createMockComment, resetIdCounter } from './test-utils.js';
+import { createMockIssue, createMockApp, createMockComment, createMockEvent, resetIdCounter } from './test-utils.js';
 
 // Mock firestore service
 vi.mock('../services/firestore.js', () => ({
@@ -13,10 +13,17 @@ vi.mock('../services/firestore.js', () => ({
   updateIssue: vi.fn(),
   getApp: vi.fn(),
   getEventsByIssue: vi.fn(),
+  getAttachmentsByEventIds: vi.fn().mockResolvedValue([]),
   createComment: vi.fn(),
   getComments: vi.fn().mockResolvedValue([]),
   getAllUsers: vi.fn().mockResolvedValue([]),
   createNotifications: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock storage service
+vi.mock('../services/storage.js', () => ({
+  isStorageConfigured: vi.fn().mockReturnValue(true),
+  generateSignedUrl: vi.fn().mockResolvedValue('https://storage.example.com/signed'),
 }));
 
 // Mock email service - parseMentions uses real implementation
@@ -93,6 +100,8 @@ vi.mock('../middleware/index.js', () => ({
 
 import * as firestoreService from '../services/firestore.js';
 import * as emailService from '../services/email.js';
+import * as storageService from '../services/storage.js';
+import * as contextGenerator from '../services/context-generator.js';
 import issuesRouter from '../routes/issues.js';
 
 function createApp() {
@@ -476,6 +485,94 @@ describe('Issue Routes', () => {
         .send({});
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  // ============ Context Download Endpoint ============
+
+  describe('GET /issues/:issue_id/context', () => {
+    it('fetches attachment URLs and passes them to the generator when events have attachments', async () => {
+      const issue = createMockIssue({ issue_id: 'issue-1' });
+      const eventWithAtt = createMockEvent({ event_id: 'evt-001', attachment_refs: ['att-001'] });
+      const mockAttachment = {
+        attachment_id: 'att-001',
+        event_id: 'evt-001',
+        filename: 'screenshot.png',
+        storage_path: 'attachments/app-001/evt-001/att-001.png',
+      };
+
+      vi.mocked(firestoreService.getIssue).mockResolvedValue(issue);
+      vi.mocked(firestoreService.getApp).mockResolvedValue(createMockApp());
+      vi.mocked(firestoreService.getEventsByIssue).mockResolvedValue([eventWithAtt]);
+      vi.mocked(firestoreService.getAttachmentsByEventIds).mockResolvedValue([mockAttachment] as any);
+      vi.mocked(storageService.generateSignedUrl).mockResolvedValue('https://storage.example.com/signed');
+      vi.mocked(contextGenerator.generateContextFile).mockReturnValue('# mock markdown');
+
+      const res = await request(app).get('/issues/issue-1/context');
+
+      expect(res.status).toBe(200);
+      expect(firestoreService.getAttachmentsByEventIds).toHaveBeenCalledWith(['evt-001']);
+      expect(storageService.generateSignedUrl).toHaveBeenCalledWith(
+        'attachments/app-001/evt-001/att-001.png',
+        1440
+      );
+      expect(contextGenerator.generateContextFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachmentUrls: [
+            expect.objectContaining({
+              attachment_id: 'att-001',
+              event_id: 'evt-001',
+              filename: 'screenshot.png',
+              url: 'https://storage.example.com/signed',
+            }),
+          ],
+        })
+      );
+    });
+
+    it('skips attachment fetching when no events have attachments', async () => {
+      const issue = createMockIssue({ issue_id: 'issue-1' });
+
+      vi.mocked(firestoreService.getIssue).mockResolvedValue(issue);
+      vi.mocked(firestoreService.getApp).mockResolvedValue(createMockApp());
+      vi.mocked(firestoreService.getEventsByIssue).mockResolvedValue([createMockEvent()]);
+      vi.mocked(contextGenerator.generateContextFile).mockReturnValue('# mock markdown');
+
+      const res = await request(app).get('/issues/issue-1/context');
+
+      expect(res.status).toBe(200);
+      expect(firestoreService.getAttachmentsByEventIds).not.toHaveBeenCalled();
+      expect(storageService.generateSignedUrl).not.toHaveBeenCalled();
+      expect(contextGenerator.generateContextFile).toHaveBeenCalledWith(
+        expect.objectContaining({ attachmentUrls: [] })
+      );
+    });
+
+    it('skips attachment fetching when storage is not configured', async () => {
+      const issue = createMockIssue({ issue_id: 'issue-1' });
+      const eventWithAtt = createMockEvent({ event_id: 'evt-001', attachment_refs: ['att-001'] });
+
+      vi.mocked(firestoreService.getIssue).mockResolvedValue(issue);
+      vi.mocked(firestoreService.getApp).mockResolvedValue(createMockApp());
+      vi.mocked(firestoreService.getEventsByIssue).mockResolvedValue([eventWithAtt]);
+      vi.mocked(storageService.isStorageConfigured).mockReturnValue(false);
+      vi.mocked(contextGenerator.generateContextFile).mockReturnValue('# mock markdown');
+
+      const res = await request(app).get('/issues/issue-1/context');
+
+      expect(res.status).toBe(200);
+      expect(firestoreService.getAttachmentsByEventIds).not.toHaveBeenCalled();
+      expect(contextGenerator.generateContextFile).toHaveBeenCalledWith(
+        expect.objectContaining({ attachmentUrls: [] })
+      );
+    });
+
+    it('returns 404 when issue is not found', async () => {
+      vi.mocked(firestoreService.getIssue).mockResolvedValue(null);
+
+      const res = await request(app).get('/issues/nonexistent/context');
+
+      expect(res.status).toBe(404);
     });
   });
 });
