@@ -28,6 +28,7 @@ export interface AttachmentUrl {
   event_id: string;
   filename: string;
   url: string;
+  expires_at: string;
 }
 
 export interface ContextFileData {
@@ -136,7 +137,8 @@ export function generateContextFile(data: ContextFileData): string {
     lines.push('');
 
     if (data.attachmentUrls && data.attachmentUrls.length > 0) {
-      lines.push('> Note: Image URLs are time-limited signed links valid for 24 hours.');
+      const expiresAt = data.attachmentUrls[0].expires_at;
+      lines.push(`> Note: Image URLs expire at **${expiresAt}**. Re-download this file if URLs have expired.`);
       lines.push('');
       data.attachmentUrls.forEach((att) => {
         lines.push(`![${att.filename}](${att.url})`);
@@ -433,7 +435,7 @@ export function generateContextJSON(data: ContextFileData): object {
               event_id: att.event_id,
               filename: att.filename,
               url: att.url,
-              url_note: 'Time-limited signed URL valid for 24 hours',
+              url_expires_at: att.expires_at,
             })),
           }
         : { note: 'Image attachments are available in the BritePulse console under the Events tab' }),

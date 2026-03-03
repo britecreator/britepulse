@@ -734,14 +734,16 @@ router.get(
       .map((e) => e.event_id);
 
     if (eventIdsWithAttachments.length > 0 && storageService.isStorageConfigured()) {
+      const EXPIRY_MINUTES = 1440; // 24 hours
+      const expiresAt = new Date(Date.now() + EXPIRY_MINUTES * 60 * 1000).toISOString();
       const attachments = await firestoreService.getAttachmentsByEventIds(eventIdsWithAttachments);
       attachmentUrls = await Promise.all(
         attachments.map(async (att) => ({
           attachment_id: att.attachment_id,
           event_id: att.event_id ?? '',
           filename: att.filename,
-          // 24-hour signed URLs so AI agents have time to use the downloaded context file
-          url: await storageService.generateSignedUrl(att.storage_path, 1440),
+          url: await storageService.generateSignedUrl(att.storage_path, EXPIRY_MINUTES),
+          expires_at: expiresAt,
         }))
       );
     }

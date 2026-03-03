@@ -524,6 +524,7 @@ describe('Issue Routes', () => {
               event_id: 'evt-001',
               filename: 'screenshot.png',
               url: 'https://storage.example.com/signed',
+              expires_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
             }),
           ],
         })

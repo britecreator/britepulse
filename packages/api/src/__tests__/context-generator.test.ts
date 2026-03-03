@@ -22,6 +22,7 @@ const mockAttachmentUrls = [
     event_id: 'evt-001',
     filename: 'screenshot.png',
     url: 'https://storage.example.com/signed?token=abc123',
+    expires_at: '2026-03-04T16:57:55.000Z',
   },
 ];
 
@@ -38,7 +39,8 @@ describe('generateContextFile - Attachments section', () => {
 
     expect(md).toContain('## Attachments');
     expect(md).toContain('![screenshot.png](https://storage.example.com/signed?token=abc123)');
-    expect(md).toContain('time-limited signed links valid for 24 hours');
+    expect(md).toContain('2026-03-04T16:57:55.000Z');
+    expect(md).toContain('Re-download this file if URLs have expired');
     // Should NOT show the fallback console link
     expect(md).not.toContain('View attachments in the BritePulse console');
   });
@@ -82,7 +84,7 @@ describe('generateContextFile - Attachments section', () => {
   it('renders multiple images when multiple attachments are provided', () => {
     const twoUrls = [
       ...mockAttachmentUrls,
-      { attachment_id: 'att-002', event_id: 'evt-001', filename: 'before.jpg', url: 'https://storage.example.com/before' },
+      { attachment_id: 'att-002', event_id: 'evt-001', filename: 'before.jpg', url: 'https://storage.example.com/before', expires_at: '2026-03-04T16:57:55.000Z' },
     ];
     const md = generateContextFile({
       issue: baseIssue,
@@ -115,7 +117,7 @@ describe('generateContextJSON - Attachments field', () => {
       event_id: 'evt-001',
       filename: 'screenshot.png',
       url: 'https://storage.example.com/signed?token=abc123',
-      url_note: 'Time-limited signed URL valid for 24 hours',
+      url_expires_at: '2026-03-04T16:57:55.000Z',
     });
     expect(json.attachments.note).toBeUndefined();
   });
