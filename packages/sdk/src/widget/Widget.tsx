@@ -17,6 +17,7 @@ type Category = 'bug' | 'feature' | 'feedback';
 // Max file size in bytes (5MB)
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const MAX_ATTACHMENTS = 3;
 
 export function Widget({ config, onSubmit }: WidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -27,7 +28,7 @@ export function Widget({ config, onSubmit }: WidgetProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isButtonHovered, setIsButtonHovered] = useState(false);
-  const [attachment, setAttachment] = useState<{ file: File; preview: string } | null>(null);
+  const [attachments, setAttachments] = useState<{ file: File; preview: string }[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,8 +40,11 @@ export function Widget({ config, onSubmit }: WidgetProps) {
     const file = input.files?.[0];
     setAttachmentError(null);
 
-    if (!file) {
-      setAttachment(null);
+    if (!file) return;
+
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      setAttachmentError(`Maximum ${MAX_ATTACHMENTS} images allowed`);
+      input.value = '';
       return;
     }
 
@@ -61,20 +65,15 @@ export function Widget({ config, onSubmit }: WidgetProps) {
     // Create preview
     const reader = new FileReader();
     reader.onload = () => {
-      setAttachment({
-        file,
-        preview: reader.result as string,
-      });
+      setAttachments((prev) => [...prev, { file, preview: reader.result as string }]);
     };
     reader.readAsDataURL(file);
-  }, []);
+    input.value = '';
+  }, [attachments.length]);
 
-  const removeAttachment = useCallback(() => {
-    setAttachment(null);
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
     setAttachmentError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   }, []);
 
   const handlePaste = useCallback((e: ClipboardEvent) => {
@@ -87,6 +86,11 @@ export function Widget({ config, onSubmit }: WidgetProps) {
         if (!file) return;
         setAttachmentError(null);
 
+        if (attachments.length >= MAX_ATTACHMENTS) {
+          setAttachmentError(`Maximum ${MAX_ATTACHMENTS} images allowed`);
+          return;
+        }
+
         if (!ALLOWED_TYPES.includes(file.type)) {
           setAttachmentError('Please select an image file (JPEG, PNG, GIF, or WebP)');
           return;
@@ -98,37 +102,40 @@ export function Widget({ config, onSubmit }: WidgetProps) {
 
         const reader = new FileReader();
         reader.onload = () => {
-          setAttachment({
+          setAttachments((prev) => [...prev, {
             file: new File([file], file.name || 'pasted-image.png', { type: file.type }),
             preview: reader.result as string,
-          });
+          }]);
         };
         reader.readAsDataURL(file);
         return;
       }
     }
-  }, []);
+  }, [attachments.length]);
 
   const handleSubmit = useCallback(async () => {
     if (!description.trim()) return;
 
     setIsSubmitting(true);
 
-    // Convert attachment to base64 if present
-    let attachments: AttachmentData[] | undefined;
-    if (attachment) {
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(attachment.file);
-      });
-
-      attachments = [{
-        filename: attachment.file.name,
-        content_type: attachment.file.type,
-        data: base64,
-        user_opted_in: true,
-      }];
+    // Convert attachments to base64 if present
+    let attachmentData: AttachmentData[] | undefined;
+    if (attachments.length > 0) {
+      attachmentData = await Promise.all(
+        attachments.map(async (att) => {
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(att.file);
+          });
+          return {
+            filename: att.file.name,
+            content_type: att.file.type,
+            data: base64,
+            user_opted_in: true as const,
+          };
+        })
+      );
     }
 
     const feedback: FeedbackData = {
@@ -136,7 +143,7 @@ export function Widget({ config, onSubmit }: WidgetProps) {
       description: description.trim(),
       reproductionSteps: steps.trim() || undefined,
       allowContact,
-      attachments,
+      attachments: attachmentData,
     };
 
     const success = await onSubmit(feedback);
@@ -153,13 +160,10 @@ export function Widget({ config, onSubmit }: WidgetProps) {
         setSteps('');
         setAllowContact(false);
         setCategory('bug');
-        setAttachment(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        setAttachments([]);
       }, 2000);
     }
-  }, [category, description, steps, allowContact, attachment, onSubmit]);
+  }, [category, description, steps, allowContact, attachments, onSubmit]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
@@ -274,29 +278,34 @@ export function Widget({ config, onSubmit }: WidgetProps) {
                     onChange={handleFileSelect}
                     style={{ display: 'none' }}
                   />
-                  {attachment ? (
-                    <div style={styles.attachmentPreview}>
-                      <img
-                        src={attachment.preview}
-                        alt="Attachment preview"
-                        style={styles.attachmentImage}
-                      />
-                      <button
-                        onClick={removeAttachment}
-                        style={styles.attachmentRemove}
-                        type="button"
-                      >
-                        ×
-                      </button>
+                  {attachments.length > 0 && (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+                      {attachments.map((att, index) => (
+                        <div key={index} style={styles.attachmentPreview}>
+                          <img
+                            src={att.preview}
+                            alt={`Attachment ${index + 1}`}
+                            style={styles.attachmentImage}
+                          />
+                          <button
+                            onClick={() => removeAttachment(index)}
+                            style={styles.attachmentRemove}
+                            type="button"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ) : (
+                  )}
+                  {attachments.length < MAX_ATTACHMENTS && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <button
                         onClick={() => fileInputRef.current?.click()}
                         style={styles.attachmentButton}
                         type="button"
                       >
-                        📎 Attach image
+                        📎 Attach image{attachments.length > 0 ? ` (${attachments.length}/${MAX_ATTACHMENTS})` : ''}
                       </button>
                       <span style={{ fontSize: '12px', color: '#9CA3AF' }}>or paste a screenshot</span>
                     </div>
