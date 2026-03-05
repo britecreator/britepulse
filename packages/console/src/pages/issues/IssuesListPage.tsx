@@ -4,7 +4,7 @@ import { useIssues, useApps } from '../../hooks/useApi';
 import { useMyAppIds } from '../../hooks/useMyAppIds';
 import type { IssueStatus, Severity, Environment, Issue } from '../../types';
 
-const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'wont_fix'];
+const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'blocked', 'snoozed', 'resolved', 'wont_fix'];
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3'];
 
 // Format date for display (e.g., "Jan 20, 2:30 PM" or "Jan 20, 2025" if older)
@@ -38,7 +38,7 @@ export default function IssuesListPage() {
   const [filters, setFilters] = useState({
     app_id: '',
     environment: '' as Environment | '',
-    status: ['new', 'triaged', 'in_progress'] as IssueStatus[],
+    status: ['new', 'triaged', 'in_progress', 'blocked'] as IssueStatus[],
     severity: [] as Severity[],
     search: '',
     sort_by: 'priority_score' as const,
