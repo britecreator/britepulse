@@ -19,7 +19,7 @@ import {
 import * as firestoreService from '../services/firestore.js';
 import * as storageService from '../services/storage.js';
 import { generateContextFile, generateContextJSON } from '../services/context-generator.js';
-import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification, parseMentions, sendTeamMentionNotification, type CommentAttachmentUrl } from '../services/email.js';
+import { sendResolvedNotification, sendWontFixNotification, sendCommentNotification, parseMentions, sendTeamMentionNotification, sendAssignmentNotification, type CommentAttachmentUrl } from '../services/email.js';
 import { config } from '../config.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -277,6 +277,16 @@ router.post(
       reason,
     });
 
+    // Send email notification to the newly assigned user
+    if (assigned_to && assigned_to !== issue.routing?.assigned_to) {
+      const app = await firestoreService.getApp(issue.app_id);
+      if (app) {
+        sendAssignmentNotification(issue, app, assigned_to, user.name || user.email).catch((err) => {
+          console.error('[Issues] Failed to send assignment notification:', err);
+        });
+      }
+    }
+
     res.json({ data: updatedIssue });
   })
 );
@@ -486,6 +496,7 @@ router.post(
     // Send email notifications to @mentioned users
     const allUsers = mentions.length > 0 ? await firestoreService.getAllUsers() : [];
     const teamEmails = new Set(allUsers.map((u) => u.email.toLowerCase()));
+    const skippedMentions: string[] = [];
 
     if (mentions.length > 0) {
       const app = await firestoreService.getApp(issue.app_id);
@@ -510,17 +521,19 @@ router.post(
           if (attachmentUrls.length === 0) attachmentUrls = undefined;
         }
 
+        const allowedDomain = config.allowedDomain;
         for (const email of mentions) {
           if (email === reporterEmail) {
             sendCommentNotification(issue, app, comment, attachmentUrls).catch((err) => {
               console.error('[Issues] Failed to send comment notification to reporter:', err);
             });
-          } else if (teamEmails.has(email)) {
+          } else if (teamEmails.has(email) || (allowedDomain && email.endsWith('@' + allowedDomain))) {
             sendTeamMentionNotification(issue, app, comment, email, attachmentUrls).catch((err) => {
               console.error('[Issues] Failed to send mention notification:', err);
             });
+          } else {
+            skippedMentions.push(email);
           }
-          // Unknown emails are silently skipped
         }
       }
     }
@@ -581,7 +594,10 @@ router.post(
       });
     }
 
-    res.json({ data: comment });
+    res.json({
+      data: comment,
+      ...(skippedMentions.length > 0 && { skipped_mentions: skippedMentions }),
+    });
   })
 );
 

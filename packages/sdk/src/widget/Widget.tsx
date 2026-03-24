@@ -19,8 +19,19 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_ATTACHMENTS = 3;
 
+const MINIMIZED_KEY = 'britepulse-widget-minimized';
+
+function getInitialMinimized(): boolean {
+  try {
+    return localStorage.getItem(MINIMIZED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export function Widget({ config, onSubmit }: WidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(getInitialMinimized);
   const [category, setCategory] = useState<Category>('bug');
   const [description, setDescription] = useState('');
   const [steps, setSteps] = useState('');
@@ -28,9 +39,20 @@ export function Widget({ config, onSubmit }: WidgetProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isButtonHovered, setIsButtonHovered] = useState(false);
+  const [isMinimizedHovered, setIsMinimizedHovered] = useState(false);
   const [attachments, setAttachments] = useState<{ file: File; preview: string }[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleMinimize = useCallback(() => {
+    setIsMinimized(true);
+    try { localStorage.setItem(MINIMIZED_KEY, 'true'); } catch {}
+  }, []);
+
+  const handleExpand = useCallback(() => {
+    setIsMinimized(false);
+    try { localStorage.removeItem(MINIMIZED_KEY); } catch {}
+  }, []);
 
   const position = config.widgetPosition || 'bottom-right';
   const buttonText = config.widgetButtonText || 'Feedback';
@@ -183,22 +205,51 @@ export function Widget({ config, onSubmit }: WidgetProps) {
 
   return (
     <div style={{ ...styles.container, ...positionStyle }}>
-      {/* Floating Button */}
-      {!isOpen && (
+      {/* Minimized dot */}
+      {!isOpen && isMinimized && (
         <button
-          onClick={() => setIsOpen(true)}
-          onMouseEnter={() => setIsButtonHovered(true)}
-          onMouseLeave={() => setIsButtonHovered(false)}
+          onClick={handleExpand}
+          onMouseEnter={() => setIsMinimizedHovered(true)}
+          onMouseLeave={() => setIsMinimizedHovered(false)}
           style={{
-            ...styles.button,
-            ...(isButtonHovered ? styles.buttonHover : {}),
+            ...styles.minimizedButton,
+            ...(isMinimizedHovered ? styles.minimizedButtonHover : {}),
           }}
+          title="Expand feedback widget"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" />
           </svg>
-          {buttonText}
         </button>
+      )}
+
+      {/* Floating Button (expanded) */}
+      {!isOpen && !isMinimized && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            onClick={() => setIsOpen(true)}
+            onMouseEnter={() => setIsButtonHovered(true)}
+            onMouseLeave={() => setIsButtonHovered(false)}
+            style={{
+              ...styles.button,
+              ...(isButtonHovered ? styles.buttonHover : {}),
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" />
+            </svg>
+            {buttonText}
+          </button>
+          <button
+            onClick={handleMinimize}
+            style={styles.collapseButton}
+            title="Minimize feedback widget"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 13H5v-2h14v2z" />
+            </svg>
+          </button>
+        </div>
       )}
 
       {/* Modal */}

@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://britepulse-console-29820647719.us-central1.run.app"],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

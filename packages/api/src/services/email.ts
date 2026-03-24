@@ -492,6 +492,123 @@ Powered by BritePulse
 }
 
 /**
+ * Send notification email when a team member is assigned to an issue.
+ */
+export async function sendAssignmentNotification(
+  issue: Issue,
+  app: App,
+  assigneeEmail: string,
+  assignedByName: string
+): Promise<SendResult> {
+  if (!ensureConfigured()) {
+    return { success: false, error: 'SendGrid not configured' };
+  }
+
+  const issueTypeLabel = issue.issue_type === 'bug' ? 'Bug Report' :
+                         issue.issue_type === 'feedback' ? 'Feedback' :
+                         issue.issue_type === 'feature' ? 'Feature Request' : 'Issue';
+
+  const safeAppName = escapeHtml(app.name);
+  const safeTitle = escapeHtml(issue.title);
+  const safeDescription = escapeHtml(issue.description.substring(0, 200));
+  const descriptionEllipsis = issue.description.length > 200 ? '...' : '';
+  const safeAssignedBy = escapeHtml(assignedByName);
+  const consoleUrl = `${config.consoleBaseUrl}/issues/${issue.issue_id}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Issue Assigned to You</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">Issue Assigned to You</h1>
+  </div>
+
+  <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+    <p style="margin-top: 0;">Hi there,</p>
+
+    <p><strong>${safeAssignedBy}</strong> assigned you a ${issueTypeLabel.toLowerCase()} for <strong>${safeAppName}</strong>:</p>
+
+    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;">
+        <strong style="color: #374151;">${issueTypeLabel}</strong>
+      </p>
+      <h2 style="margin: 0 0 15px 0; font-size: 18px; color: #111827;">${safeTitle}</h2>
+      <p style="margin: 0; color: #6b7280; font-size: 14px;">${safeDescription}${descriptionEllipsis}</p>
+    </div>
+
+    <p><a href="${consoleUrl}" style="color: #2563eb; text-decoration: underline;">View this issue in the BritePulse console</a></p>
+
+    <p style="margin-bottom: 0; color: #6b7280; font-size: 14px;">
+      — The ${safeAppName} Team
+    </p>
+  </div>
+
+  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+    <p style="margin: 0;">Powered by <a href="https://britepulse.io" style="color: #6b7280;">BritePulse</a></p>
+  </div>
+</body>
+</html>
+`;
+
+  const text = `
+Issue Assigned to You
+
+Hi there,
+
+${assignedByName} assigned you a ${issueTypeLabel.toLowerCase()} for ${app.name}:
+
+${issueTypeLabel}: ${issue.title}
+
+${issue.description.substring(0, 300)}${issue.description.length > 300 ? '...' : ''}
+
+View this issue in the BritePulse console: ${consoleUrl}
+
+— The ${app.name} Team
+
+---
+Powered by BritePulse
+`.trim();
+
+  try {
+    const msg = {
+      to: assigneeEmail,
+      from: {
+        email: config.sendgridFromEmail,
+        name: app.name,
+      },
+      subject: `Issue assigned to you: ${issue.title}`,
+      text,
+      html,
+      categories: ['issue-assignment', app.app_id],
+      customArgs: {
+        issue_id: issue.issue_id,
+        app_id: app.app_id,
+      },
+    };
+
+    const [response] = await sgMail.send(msg);
+
+    console.log(`[Email] Sent assignment notification to ${assigneeEmail} for issue ${issue.issue_id}`);
+
+    return {
+      success: true,
+      messageId: response.headers['x-message-id']?.toString(),
+    };
+  } catch (error) {
+    console.error('[Email] SendGrid assignment error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
  * Parse @mentions from a comment body.
  * Matches @user@domain.tld patterns where the leading @ is the mention sigil.
  * Returns deduplicated array of lowercase email addresses.

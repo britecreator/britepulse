@@ -311,14 +311,19 @@ export function useIssueComments(issueId: string) {
   });
 }
 
+export interface AddCommentResult {
+  comment: IssueComment;
+  skipped_mentions?: string[];
+}
+
 export function useAddComment(issueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: { body: string; attachment_ids?: string[] }) =>
-      fetchApi<{ data: IssueComment }>(`/issues/${issueId}/comments`, {
+      fetchApi<{ data: IssueComment; skipped_mentions?: string[] }>(`/issues/${issueId}/comments`, {
         method: 'POST',
         body: JSON.stringify(data),
-      }).then((r) => r.data),
+      }).then((r) => ({ comment: r.data, skipped_mentions: r.skipped_mentions })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues', issueId, 'comments'] });
     },

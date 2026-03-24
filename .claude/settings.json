@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" run list --limit 5)",
+      "Bash(\"/c/Users/DustinSitar/AppData/Local/Programs/GitHub CLI/gh.exe\" run list --limit 5)",
+      "Bash(cmd.exe /c \"gh run list --limit 5\")",
+      "Bash(cmd.exe /c \"gh run view 14437498498 --log-failed\")",
+      "Bash(npx vitest run packages/api/src/__tests__/email.test.ts)",
+      "Read(//c/Users/DUSTIN~1/AppData/Local/Temp/claude/c--Users-DustinSitar-Documents-britepulse/tasks/**)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(npm test)",
+      "Bash(./node_modules/.bin/vitest run)",
+      "Bash(git status -u)",
+      "Bash(screenshot\" hint in both the widget and console comments. Removed:*)",
+      "Bash(npx pnpm -r build)",
+      "Bash(npx vitest run)"
+    ]
+  }
+}

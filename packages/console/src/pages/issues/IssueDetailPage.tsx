@@ -271,10 +271,13 @@ export default function IssueDetailPage() {
     const attachment_ids = pendingAttachments.length > 0
       ? pendingAttachments.map((a) => a.id)
       : undefined;
-    await addComment.mutateAsync({
+    const result = await addComment.mutateAsync({
       body: commentText.trim() || '(image attached)',
       ...(attachment_ids && { attachment_ids }),
     });
+    if (result.skipped_mentions && result.skipped_mentions.length > 0) {
+      alert(`Notification was not sent to the following external email(s): ${result.skipped_mentions.join(', ')}`);
+    }
     setCommentText('');
     setPendingAttachments([]);
     hasPrefilledRef.current = false;

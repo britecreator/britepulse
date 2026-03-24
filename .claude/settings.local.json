@@ -87,7 +87,9 @@
       "Bash(gcloud.cmd run services logs read:*)",
       "Bash(gh.exe run list:*)",
       "Bash(npm run build:*)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(npm run test:run)",
+      "WebFetch(domain:storage.googleapis.com)"
     ]
   }
 }
