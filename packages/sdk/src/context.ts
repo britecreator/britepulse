@@ -194,14 +194,24 @@ export function setupTraceInterceptor(): void {
     const traceId = getTraceId() || generateTraceId();
     setTraceId(traceId);
 
-    const headers = new Headers(init?.headers);
-    if (!headers.has(TRACE_HEADER)) {
-      headers.set(TRACE_HEADER, traceId);
-    }
-
     // Get URL and method for error reporting
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const method = init?.method || 'GET';
+
+    // Only add trace header to same-origin requests to avoid breaking CORS preflight
+    // on cross-origin requests (e.g. Firebase Auth, third-party APIs)
+    const isSameOrigin = (() => {
+      try {
+        return new URL(url, window.location.href).origin === window.location.origin;
+      } catch {
+        return false;
+      }
+    })();
+
+    const headers = new Headers(init?.headers);
+    if (isSameOrigin && !headers.has(TRACE_HEADER)) {
+      headers.set(TRACE_HEADER, traceId);
+    }
 
     return savedFetch.call(this, input, {
       ...init,
@@ -278,10 +288,15 @@ export function setupXHRInterceptor(): void {
     const traceId = getTraceId() || generateTraceId();
     setTraceId(traceId);
 
+    // Only add trace header to same-origin requests to avoid breaking CORS preflight
+    // on cross-origin requests (e.g. Firebase Auth, third-party APIs)
     try {
-      this.setRequestHeader(TRACE_HEADER, traceId);
+      const isSameOrigin = new URL(xhr._britepulse_url || '', window.location.href).origin === window.location.origin;
+      if (isSameOrigin) {
+        this.setRequestHeader(TRACE_HEADER, traceId);
+      }
     } catch {
-      // Headers already sent or not allowed
+      // URL parsing failed or headers already sent
     }
 
     // Add error capture listener
