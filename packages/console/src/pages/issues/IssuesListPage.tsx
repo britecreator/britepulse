@@ -2,10 +2,13 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useIssues, useApps } from '../../hooks/useApi';
 import { useMyAppIds } from '../../hooks/useMyAppIds';
+import { useAuth } from '../../contexts/AuthContext';
 import type { IssueStatus, Severity, Environment, Issue } from '../../types';
 
 const STATUSES: IssueStatus[] = ['new', 'triaged', 'in_progress', 'blocked', 'snoozed', 'resolved', 'wont_fix'];
 const SEVERITIES: Severity[] = ['P0', 'P1', 'P2', 'P3'];
+
+type AppScope = 'assigned_to_me' | 'my_apps' | 'all_apps';
 
 // Format date for display (e.g., "Jan 20, 2:30 PM" or "Jan 20, 2025" if older)
 function formatDate(dateString: string): string {
@@ -31,8 +34,9 @@ function formatDate(dateString: string): string {
 }
 
 export default function IssuesListPage() {
+  const { user } = useAuth();
   const { myAppIds, ownsApps } = useMyAppIds();
-  const [appScope, setAppScope] = useState<'my_apps' | 'all_apps'>('my_apps');
+  const [appScope, setAppScope] = useState<AppScope>('assigned_to_me');
 
   // Default to showing active statuses (exclude 'resolved' and 'wont_fix')
   const [filters, setFilters] = useState({
@@ -61,11 +65,14 @@ export default function IssuesListPage() {
   // Build effective filters for the API call
   const effectiveFilters = useMemo(() => {
     const base = { ...filters };
+    if (appScope === 'assigned_to_me' && user?.email) {
+      return { ...base, app_id: '', assigned_to: user.email };
+    }
     if (appScope === 'my_apps' && ownsApps && !filters.app_id) {
       return { ...base, app_ids: myAppIds };
     }
     return base;
-  }, [filters, appScope, ownsApps, myAppIds]);
+  }, [filters, appScope, ownsApps, myAppIds, user?.email]);
 
   const { data, isLoading, error } = useIssues(effectiveFilters);
 
@@ -127,8 +134,21 @@ export default function IssuesListPage() {
 
       {/* Filters */}
       <div className="card p-4">
-        {ownsApps && (
-          <div className="mb-4 flex items-center space-x-1 bg-gray-100 rounded-lg p-1 w-fit">
+        <div className="mb-4 flex items-center space-x-1 bg-gray-100 rounded-lg p-1 w-fit">
+          <button
+            onClick={() => {
+              setAppScope('assigned_to_me');
+              setFilters(f => ({ ...f, app_id: '', page: 1 }));
+            }}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              appScope === 'assigned_to_me'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Assigned to Me
+          </button>
+          {ownsApps && (
             <button
               onClick={() => {
                 setAppScope('my_apps');
@@ -142,40 +162,42 @@ export default function IssuesListPage() {
             >
               My Apps
             </button>
-            <button
-              onClick={() => {
-                setAppScope('all_apps');
-                setFilters(f => ({ ...f, app_id: '', page: 1 }));
-              }}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                appScope === 'all_apps'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              All Apps
-            </button>
-          </div>
-        )}
+          )}
+          <button
+            onClick={() => {
+              setAppScope('all_apps');
+              setFilters(f => ({ ...f, app_id: '', page: 1 }));
+            }}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              appScope === 'all_apps'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            All Apps
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label className="label">Application</label>
-            <select
-              className="input mt-1"
-              value={filters.app_id}
-              onChange={(e) => setFilters((f) => ({ ...f, app_id: e.target.value, page: 1 }))}
-            >
-              <option value="">
-                {appScope === 'my_apps' && ownsApps ? 'All My Apps' : 'All Apps'}
-              </option>
-              {filteredApps?.map((app) => (
-                <option key={app.app_id} value={app.app_id}>
-                  {app.name}
+          {appScope !== 'assigned_to_me' && (
+            <div>
+              <label className="label">Application</label>
+              <select
+                className="input mt-1"
+                value={filters.app_id}
+                onChange={(e) => setFilters((f) => ({ ...f, app_id: e.target.value, page: 1 }))}
+              >
+                <option value="">
+                  {appScope === 'my_apps' && ownsApps ? 'All My Apps' : 'All Apps'}
                 </option>
-              ))}
-            </select>
-          </div>
+                {filteredApps?.map((app) => (
+                  <option key={app.app_id} value={app.app_id}>
+                    {app.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="label">Environment</label>
             <select
@@ -249,7 +271,35 @@ export default function IssuesListPage() {
           </div>
         ) : data?.issues?.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            No issues found matching your filters
+            {appScope === 'assigned_to_me' ? (
+              <>
+                <p>No issues are assigned to you</p>
+                <div className="mt-3 flex justify-center gap-4">
+                  {ownsApps && (
+                    <button
+                      onClick={() => {
+                        setAppScope('my_apps');
+                        setFilters(f => ({ ...f, app_id: '', page: 1 }));
+                      }}
+                      className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      View My Apps
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setAppScope('all_apps');
+                      setFilters(f => ({ ...f, app_id: '', page: 1 }));
+                    }}
+                    className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    View All Apps
+                  </button>
+                </div>
+              </>
+            ) : (
+              'No issues found matching your filters'
+            )}
           </div>
         ) : (
           <>
