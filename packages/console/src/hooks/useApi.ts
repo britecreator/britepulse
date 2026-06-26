@@ -18,6 +18,24 @@ function getAuthHeaders(): HeadersInit {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
+// Guard so concurrent 401s (e.g. issues query + notifications polling firing
+// together) trigger only a single redirect.
+let redirectingToAuth = false;
+
+/**
+ * The API rejected our token (expired or invalid). The Google SSO session
+ * typically outlives the 1-hour ID token, so redirecting back through
+ * /auth/google round-trips silently and returns the user to the current page
+ * with a fresh token.
+ */
+function handleSessionExpired() {
+  if (redirectingToAuth) return;
+  redirectingToAuth = true;
+  localStorage.removeItem(TOKEN_KEY);
+  const returnTo = window.location.pathname + window.location.search;
+  window.location.href = `${API_BASE}/auth/google?redirect=${encodeURIComponent(returnTo)}`;
+}
+
 async function fetchApi<T>(
   path: string,
   options: RequestInit = {}
@@ -32,6 +50,13 @@ async function fetchApi<T>(
   });
 
   if (!response.ok) {
+    // Session expired/invalid — recover by re-authenticating in place instead
+    // of surfacing a raw "HTTP 401" error. (403 stays a real permission error.)
+    if (response.status === 401) {
+      handleSessionExpired();
+      throw new Error('Session expired — reauthenticating…');
+    }
+
     const errorBody = await response.json().catch(() => ({ message: 'Request failed' }));
     const errorMessage = errorBody.message || `HTTP ${response.status}`;
 
