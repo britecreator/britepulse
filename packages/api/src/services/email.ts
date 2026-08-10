@@ -378,6 +378,7 @@ export async function sendCommentNotification(
 
   const safeAppName = escapeHtml(app.name);
   const safeTitle = escapeHtml(issue.title);
+  const safeDescription = escapeHtml(issue.description);
   const safeBody = escapeHtml(comment.body);
   const safeAuthor = escapeHtml(comment.author_name || comment.author_email);
 
@@ -413,6 +414,7 @@ export async function sendCommentNotification(
       <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;">
         <strong style="color: #374151;">${issueTypeLabel}:</strong> ${safeTitle}
       </p>
+      <p style="margin: 0; color: #6b7280; font-size: 14px; white-space: pre-wrap;">${safeDescription}</p>
       <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 12px;">
         <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280;">
           <strong>${safeAuthor}</strong> commented:
@@ -444,6 +446,8 @@ Hi there,
 There's a new comment on your ${issueTypeLabel.toLowerCase()} for ${app.name}:
 
 ${issueTypeLabel}: ${issue.title}
+
+${issue.description}
 
 ${comment.author_name || comment.author_email} commented:
 ${comment.body}${attachmentText}
@@ -645,6 +649,7 @@ export async function sendTeamMentionNotification(
 
   const safeAppName = escapeHtml(app.name);
   const safeTitle = escapeHtml(issue.title);
+  const safeDescription = escapeHtml(issue.description);
   const safeBody = escapeHtml(comment.body);
   const safeAuthor = escapeHtml(comment.author_name || comment.author_email);
   const consoleUrl = `${config.consoleBaseUrl}/issues/${issue.issue_id}`;
@@ -681,6 +686,7 @@ export async function sendTeamMentionNotification(
       <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280;">
         <strong style="color: #374151;">${issueTypeLabel}:</strong> ${safeTitle}
       </p>
+      <p style="margin: 0; color: #6b7280; font-size: 14px; white-space: pre-wrap;">${safeDescription}</p>
       <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 12px;">
         <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280;">
           <strong>${safeAuthor}</strong> commented:
@@ -712,6 +718,8 @@ Hi there,
 You were mentioned in a comment on a ${issueTypeLabel.toLowerCase()} for ${app.name}:
 
 ${issueTypeLabel}: ${issue.title}
+
+${issue.description}
 
 ${comment.author_name || comment.author_email} commented:
 ${comment.body}${attachmentText}
