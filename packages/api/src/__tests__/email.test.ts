@@ -157,8 +157,11 @@ describe('Email Service', () => {
       expect(mockSend).not.toHaveBeenCalled();
     });
 
-    it('should HTML-escape comment body in HTML template', async () => {
-      const issue = createMockIssue({ reported_by: { user_id: 'u1', email: 'r@test.com' } });
+    it('should HTML-escape comment body and issue description in HTML template', async () => {
+      const issue = createMockIssue({
+        reported_by: { user_id: 'u1', email: 'r@test.com' },
+        description: '<script>alert("desc")</script>',
+      });
       const app = createMockApp();
       const comment = createMockComment({ body: '<img src=x onerror=alert(1)>' });
 
@@ -167,6 +170,24 @@ describe('Email Service', () => {
       const msg = mockSend.mock.calls[0][0];
       expect(msg.html).not.toContain('<img src=x');
       expect(msg.html).toContain('&lt;img');
+      expect(msg.html).not.toContain('<script>');
+      expect(msg.html).toContain('&lt;script&gt;');
+    });
+
+    it('should include the full issue description without truncation', async () => {
+      const longDescription = 'When I click the checkout button, '.repeat(20) + 'THE-VERY-END';
+      const issue = createMockIssue({
+        reported_by: { user_id: 'u1', email: 'reporter@test.com' },
+        description: longDescription,
+      });
+      const app = createMockApp();
+      const comment = createMockComment({ body: 'Looking into this now.' });
+
+      await sendCommentNotification(issue, app, comment);
+
+      const msg = mockSend.mock.calls[0][0];
+      expect(msg.html).toContain(longDescription);
+      expect(msg.text).toContain(longDescription);
     });
   });
 
@@ -225,6 +246,23 @@ describe('Email Service', () => {
       expect(msg.html).toContain('https://console.test.britepulse.io/issues/issue-abc');
       // Should not include Reply-To (inbound email not configured)
       expect(msg.replyTo).toBeUndefined();
+    });
+
+    it('should include the full issue description without truncation', async () => {
+      const longDescription = 'The dashboard chart renders blank after filtering, '.repeat(15) + 'THE-VERY-END';
+      const issue = createMockIssue({
+        reported_by: { user_id: 'u1', email: 'reporter@test.com' },
+        description: longDescription,
+      });
+      const app = createMockApp();
+      const comment = createMockComment({ body: '@bob@test.com can you reproduce this?' });
+
+      const result = await sendTeamMentionNotification(issue, app, comment, 'bob@test.com');
+
+      expect(result.success).toBe(true);
+      const msg = mockSend.mock.calls[0][0];
+      expect(msg.html).toContain(longDescription);
+      expect(msg.text).toContain(longDescription);
     });
   });
 });
