@@ -147,9 +147,11 @@ router.post(
       // Filter to non-resolved issues (resolved and wont_fix are both considered closed)
       const activeIssues = issues.filter((i) => i.status !== 'resolved' && i.status !== 'wont_fix');
 
-      // Blocked issues are waiting on something external and aren't actionable,
-      // so they don't count toward whether a brief is worth sending
-      const actionableIssues = activeIssues.filter((i) => i.status !== 'blocked');
+      // Blocked issues are waiting on something external and snoozed issues were
+      // explicitly deferred, so neither counts toward whether a brief is worth sending
+      const actionableIssues = activeIssues.filter(
+        (i) => i.status !== 'blocked' && i.status !== 'snoozed'
+      );
 
       // Check "only on issues" mode
       if (briefMode === 'only_on_issues' && actionableIssues.length === 0 && !force) {

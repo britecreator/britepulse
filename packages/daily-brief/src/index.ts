@@ -62,8 +62,13 @@ export function generateBriefData(
     consoleUrl: config.consoleUrl,
     issues: rankedIssues,
     stats: {
+      // "Active Issues" means actionable: open and not deliberately parked
       totalIssues24h: issues.filter(
-        (i) => i.status !== 'resolved' && i.status !== 'wont_fix'
+        (i) =>
+          i.status !== 'resolved' &&
+          i.status !== 'wont_fix' &&
+          i.status !== 'blocked' &&
+          i.status !== 'snoozed'
       ).length,
       totalEvents24h: stats.totalEvents24h,
       newIssues24h: stats.newIssues24h,

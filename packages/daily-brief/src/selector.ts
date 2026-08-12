@@ -14,6 +14,7 @@ export interface SelectionConfig {
   minSeverity: Severity;
   includeResolved24h: boolean;
   includeBlocked: boolean;
+  includeSnoozed: boolean;
 }
 
 export const DEFAULT_SELECTION_CONFIG: SelectionConfig = {
@@ -22,6 +23,7 @@ export const DEFAULT_SELECTION_CONFIG: SelectionConfig = {
   minSeverity: 'P3',  // Include all severities by default
   includeResolved24h: true,
   includeBlocked: false,  // Blocked issues are waiting on something; nothing actionable to report
+  includeSnoozed: false,  // Snoozed issues were explicitly deferred by the user
 };
 
 /**
@@ -116,6 +118,11 @@ export function selectIssuesForBrief(
 
     // Exclude blocked issues unless configured otherwise
     if (issue.status === 'blocked' && !config.includeBlocked) {
+      return false;
+    }
+
+    // Exclude snoozed issues unless configured otherwise
+    if (issue.status === 'snoozed' && !config.includeSnoozed) {
       return false;
     }
 
