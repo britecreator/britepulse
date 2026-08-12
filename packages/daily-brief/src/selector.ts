@@ -13,6 +13,7 @@ export interface SelectionConfig {
   minItems: number;
   minSeverity: Severity;
   includeResolved24h: boolean;
+  includeBlocked: boolean;
 }
 
 export const DEFAULT_SELECTION_CONFIG: SelectionConfig = {
@@ -20,6 +21,7 @@ export const DEFAULT_SELECTION_CONFIG: SelectionConfig = {
   minItems: 5,
   minSeverity: 'P3',  // Include all severities by default
   includeResolved24h: true,
+  includeBlocked: false,  // Blocked issues are waiting on something; nothing actionable to report
 };
 
 /**
@@ -109,6 +111,11 @@ export function selectIssuesForBrief(
   const eligibleIssues = issues.filter((issue) => {
     // Must meet severity threshold
     if (!meetsSeverityThreshold(issue.severity, config.minSeverity)) {
+      return false;
+    }
+
+    // Exclude blocked issues unless configured otherwise
+    if (issue.status === 'blocked' && !config.includeBlocked) {
       return false;
     }
 
